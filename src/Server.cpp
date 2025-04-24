@@ -134,22 +134,23 @@ int main(int argc, char* argv[]) {
             char table_name[name_size];
             char tbl[tbl_name_size];
             char root[root_size];
-            //std::cout << "root : " << root_size << std::endl;
+            unsigned short root_page = static_cast<unsigned short>(root[0]);
+            //std::cout << "root : " << root_page << std::endl;
             database_file.read(type_name, type_size);
             database_file.read(table_name, name_size);
             database_file.read(tbl, tbl_name_size);
             database_file.read(root, root_size);
-
-            if (tbl == table) {
+            if (table_name == table) {
                 std::cout << table_name << std::endl;
                 unsigned short root_page = static_cast<unsigned short>(root[0]);
+                // 4096 is the default page size in sqlite
                 database_file.seekg((root_page - 1) * 4096); 
                 char buffer[5];
                 database_file.read(buffer,5);
                 unsigned short number_of_rows = (static_cast<unsigned char>(buffer[4]) | (static_cast<unsigned char>(buffer[3]) << 8));
                 std::cout << number_of_rows << std::endl;
+                break;
 
-                // 4096 is the default page size in sqlite
             }
         }
     }
