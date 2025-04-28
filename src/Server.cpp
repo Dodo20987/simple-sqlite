@@ -2,9 +2,11 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <iomanip>
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <cstdint>
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;
 // Function to parse a varint from a byte array
@@ -28,12 +30,13 @@ bool is_count(const std::string& query) {
 
     return upper_query.find("COUNT(") != std::string::npos;
 }
-unsigned short get_page_size(std::ifstream database_file) {
+unsigned short get_page_size(std::ifstream &database_file) {
     database_file.seekg(16);
     char buf[2];
     database_file.read(buf,2);
     return (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
 }
+
 void printTables(std::string database_file_path) {
     std::ifstream database_file(database_file_path, std::ios::binary);
     if (!database_file) {
@@ -166,9 +169,16 @@ void select_columns(std::string database_file_path, std::string command) {
         std::cerr << "Failed to open the database file" << std::endl;
         return;
     }
+    database_file.seekg(0, std::ios::end); 
+    std::streampos file_size = database_file.tellg(); 
+    database_file.seekg(0, std::ios::beg); 
+
+    std::cout << "File size: " << file_size << " bytes" << std::endl;
+
     std::istringstream iss(command);
     std::vector<std::string> tokens;
     std::string word;
+    auto page_size = get_page_size(database_file);
     while (iss >> word) {
         tokens.push_back(word);
     }
@@ -182,7 +192,6 @@ void select_columns(std::string database_file_path, std::string command) {
     //unsigned short cell_count = parse_varint(buf);
     //unsigned short cell_count = parse_varint(reinterpret_cast<const unsigned char*>(buf));
 
-    std::cout << cell_count << std::endl;
     for (int i = 0; i < cell_count; i++) {
         database_file.seekg(HEADER_SIZE + PAGE_SIZE + (i * 2));
         database_file.read(buf,2);
@@ -198,20 +207,7 @@ void select_columns(std::string database_file_path, std::string command) {
         // first entry contains the serial type for type, and entry 2
         // contains the serial type for name
         database_file.read(record_header, cols - 1); // -1 because the size of the header is alredy read previously
-
-        //TODO: the sizes of serial types are varints that range from 1 - 9 bytes.
-        // currently orange is not being printed beacause every field is 1 byte except for sql_size which is 2 bytes
-        // it's causing strange behaviour, need to not hardcode 1 byte. need to be able to parse varint
-        // create a function parse_varint that correctly calcuates the serial types in order to fix sql_size bugging out 
-        /*
-        unsigned short type_size = (static_cast<unsigned short>(record_header[0]) - 13) / 2;
-        unsigned short name_size = (static_cast<unsigned short>(record_header[1]) - 13) / 2;
-        unsigned short tbl_name_size = (static_cast<unsigned short>(record_header[2]) - 13) / 2;
-        unsigned short root_size = static_cast<unsigned short>(record_header[3]);
-        unsigned short sql_size = (static_cast<unsigned short>(record_header[4]) - 13) / 2;
         
-        std::cout << "cols: " << cols - 1 << std::endl;
-        std::cout << "num: " << static_cast<unsigned short>(record_header[4]) << std::endl;*/
         std::vector<unsigned int> serial_types;
         int offset = 0;
         for (int j = 0; j < cols - 1; j++) {
@@ -237,21 +233,125 @@ void select_columns(std::string database_file_path, std::string command) {
         database_file.read(tbl, tbl_name_size);
         database_file.read(root, root_size);
         database_file.read(sql_text, sql_size);
-        std::cout << sql_text << std::endl;
-        std::cout << "table name: " << table_name << std::endl;
-        /*
-        if (table_name == table) {
-            unsigned short root_page = static_cast<unsigned short>(root[0]);
+        std::vector<std::string> column_names;
+        std::string sql(sql_text, sql_size);
+        //std::cout << sql << std::endl;
+        size_t start = sql.find('(') + 1;
+        size_t end = sql.find(')');
+        std::string columns_def = sql.substr(start, end - start);
+        if (table_name == table ) {
+            std::cout << columns_def << std::endl;
+            std::istringstream col_stream(columns_def);
+            std::string col;
+            while(std::getline(col_stream, col, ',')) {
+               std::istringstream col_word_stream(col);
+               std::string col_name;
+               col_word_stream >> col_name;
+               column_names.push_back(col_name);
+            }
+            /*for(auto x : column_names) {
+                std::cout << x << std::endl;
+            }*/
 
-            // 4096 is the default page size in sqlite
-            database_file.seekg((root_page - 1) * 4096); 
-            char buffer[5];
-            database_file.read(buffer,5);
-            unsigned short number_of_rows = (static_cast<unsigned char>(buffer[4]) | (static_cast<unsigned char>(buffer[3]) << 8));
-            std::cout << number_of_rows << std::endl;
+            auto it = std::find(column_names.begin(), column_names.end(), column);
+            if (it == column_names.end()) {
+                std::cout << "Can't find the column in the given table" << std::endl;
+                return;
+            }
+
+            int col_index = std::distance(column_names.begin(), it);
+            int root_page = static_cast<unsigned char>(root[0]);
+            int page_offset = (root_page - 1) * page_size;
+            //std::cout << col_index << std::endl;
+            char buf[2];
+            database_file.seekg(page_offset + 3);
+            database_file.read(buf,2);
+            //unsigned short number_of_rows = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
+            unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
+            std::cout << "number of rows: " << number_of_rows << std::endl;
+            for (int k = 0; k < number_of_rows; k++) {
+                database_file.seekg(page_offset + PAGE_SIZE + (k * 2));
+                database_file.read(buf,2);
+                unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
+                database_file.seekg(page_offset + cell_offset);
+                unsigned char varint_buf[9];
+                database_file.read(reinterpret_cast<char*>(varint_buf), 9); 
+
+                int offset = 0;
+                int bytes;
+                uint64_t payload_size = parse_varint(varint_buf + offset, bytes);
+                //std::cout << bytes << std::endl;
+                offset += bytes;
+                uint64_t rowid = parse_varint(varint_buf + offset, bytes);
+                offset += bytes;
+                //std::cout << bytes << std::endl;
+                
+                // TODO: POTENTIAL BUGS after this point
+                // potential issue is that I'm hardcoding the 9, I should dynamically determine the size of the buffer instead?
+                database_file.seekg(page_offset + offset + cell_offset);
+                database_file.read(reinterpret_cast<char*>(varint_buf), 9);
+                offset = 0;
+                uint64_t header_size = parse_varint(varint_buf + offset, bytes);
+                offset += bytes;
+                std::vector<unsigned char> header(header_size - offset);
+                database_file.seekg(-(9 - offset), std::ios::cur);
+                // -1 because we're off by 1 when reading
+                database_file.read(reinterpret_cast<char*>(header.data()), header_size - 1);
+
+                std::vector<uint64_t> serial_types;
+                int h_offset = 0;
+
+                while(h_offset < header.size()) {
+                    uint64_t serial_type = parse_varint(&header[h_offset], bytes);
+                    serial_types.push_back(serial_type);
+                    h_offset += bytes;
+                }
+
+                std::vector<std::string> column_values;
+                for(size_t m = 0; m < serial_types.size(); ++m) {
+                    uint64_t stype = serial_types[m];
+                    int size = 0;
+                    if (stype == 0) size = 0;                   // NULL
+                    else if (stype == 1) size = 1;
+                    else if (stype == 2) size = 2;
+                    else if (stype == 3) size = 3;
+                    else if (stype == 4) size = 4;
+                    else if (stype == 5) size = 6;
+                    else if (stype == 6) size = 8;
+                    //else if (stype >= 12 && stype % 2 == 0) size = (stype - 12) / 2;
+                    else if (stype >= 13 && stype % 2 == 1) size = (stype - 13) / 2;
+                    else {
+                        std::cerr << "Unsupported serial type: " << stype << std::endl;
+                        return;
+                    }
+
+                    std::vector<char> data(size);
+                    //TODO: NOTE here eventually read causing an error because reading past the total file size
+                    // The current starting get pointer for the file may be too forward / high need to tweak it 
+                    // seems like it's 1 byte too high
+                    database_file.read(data.data(), size);
+
+
+                    if (stype >= 13) {
+                        column_values.emplace_back(data.data(), size); // TEXT
+                    } else {
+                        std::stringstream ss;
+                        for (int k = 0; k < size; ++k) {
+                            ss << std::hex << std::setfill('0') << std::setw(2) << (0xff & static_cast<unsigned char>(data[k]));
+                        }
+                        column_values.push_back(ss.str()); // store raw bytes as hex string for debugging
+                    }
+                }
+
+                if (col_index < column_values.size()) {
+                    std::cout << "Row " << k << ": " << column_values[col_index] << std::endl;
+                } else {
+                    std::cout << "Row " << k << ": [column index out of bounds]" << std::endl;
+                }
+            }
             break;
-
-        }*/
+        }
+        //std::cout << "table name: " << table_name << std::endl;
     }
 
 }
