@@ -154,12 +154,6 @@ void Database::printRowCount(const std::string& query) {
 }
 
 void Database::selectColumn(const std::string& query) {
-    database_file.seekg(0, std::ios::end); // move to end
-    std::streampos file_size = database_file.tellg(); 
-    database_file.seekg(0, std::ios::beg); 
-
-    std::cout << "File size: " << file_size << " bytes" << std::endl;
-
     std::istringstream iss(query);
     std::vector<std::string> tokens;
     std::string word;
@@ -169,13 +163,10 @@ void Database::selectColumn(const std::string& query) {
     }
     std::string table = tokens.back();
     std::string column = tokens[1];
-    std::cout << "query column: " << column << std::endl;
     char buf[2];
     database_file.seekg(HEADER_SIZE + 3);
     database_file.read(buf,2);
     unsigned short cell_count = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
-    //unsigned short cell_count = parse_varint(buf);
-    //unsigned short cell_count = parse_varint(reinterpret_cast<const unsigned char*>(buf));
 
     for (int i = 0; i < cell_count; i++) {
         database_file.seekg(HEADER_SIZE + PAGE_SIZE + (i * 2));
@@ -220,12 +211,10 @@ void Database::selectColumn(const std::string& query) {
         database_file.read(sql_text, sql_size);
         std::vector<std::string> column_names;
         std::string sql(sql_text, sql_size);
-        //std::cout << sql << std::endl;
         size_t start = sql.find('(') + 1;
         size_t end = sql.find(')');
         std::string columns_def = sql.substr(start, end - start);
         if (table_name == table ) {
-            std::cout << columns_def << std::endl;
             std::istringstream col_stream(columns_def);
             std::string col;
             while(std::getline(col_stream, col, ',')) {
@@ -234,9 +223,6 @@ void Database::selectColumn(const std::string& query) {
                col_word_stream >> col_name;
                column_names.push_back(col_name);
             }
-            /*for(auto x : column_names) {
-                std::cout << x << std::endl;
-            }*/
 
             auto it = std::find(column_names.begin(), column_names.end(), column);
             if (it == column_names.end()) {
@@ -247,13 +233,10 @@ void Database::selectColumn(const std::string& query) {
             int col_index = std::distance(column_names.begin(), it);
             int root_page = static_cast<unsigned char>(root[0]);
             int page_offset = (root_page - 1) * page_size;
-            //std::cout << col_index << std::endl;
             char buf[2];
             database_file.seekg(page_offset + 3);
             database_file.read(buf,2);
-            //unsigned short number_of_rows = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
             unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
-            std::cout << "number of rows: " << number_of_rows << std::endl;
             for (int k = 0; k < number_of_rows; k++) {
                 database_file.seekg(page_offset + PAGE_SIZE + (k * 2));
                 database_file.read(buf,2);
@@ -268,9 +251,7 @@ void Database::selectColumn(const std::string& query) {
                 offset += bytes;
                 uint64_t rowid = this->parseVarint(varint_buf + offset, bytes);
                 offset += bytes;
-                
-                // TODO: POTENTIAL BUGS after this point
-                // potential issue is that I'm hardcoding the 9, I should dynamically determine the size of the buffer instead?
+     
                 database_file.seekg(page_offset + offset + cell_offset);
                 database_file.read(reinterpret_cast<char*>(varint_buf), 9);
                 offset = 0;
@@ -308,9 +289,6 @@ void Database::selectColumn(const std::string& query) {
                     }
 
                     std::vector<char> data(size);
-                    //TODO: NOTE here eventually read causing an error because reading past the total file size
-                    // The current starting get pointer for the file may be too forward / high need to tweak it 
-                    // seems like it's 1 byte too high
                     database_file.read(data.data(), size);
 
 
@@ -326,7 +304,7 @@ void Database::selectColumn(const std::string& query) {
                 }
 
                 if (col_index < column_values.size()) {
-                    std::cout << "Row " << k << ": " << column_values[col_index] << std::endl;
+                    std::cout << column_values[col_index] << std::endl;
                 } else {
                     std::cout << "Row " << k << ": [column index out of bounds]" << std::endl;
                 }

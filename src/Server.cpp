@@ -9,6 +9,7 @@
 #include <cstdint>
 #include "../include/Database.h"
 
+//TODO: instead of parsing the sql query by position use regex on the query
 int main(int argc, char* argv[]) {
     // Flush after every std::cout / std::cerr
     std::cout << std::unitbuf;

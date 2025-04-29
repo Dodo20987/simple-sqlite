@@ -16,6 +16,7 @@ private:
     mutable std::ifstream database_file;
     unsigned int parseVarint(const unsigned char* data, int& bytes_read) const;
     const unsigned short getPageSize() const;
+    void parseSQL(const std::string& query);
 public:
     Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
     const std::streampos getFileSize() const;
