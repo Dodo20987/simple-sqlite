@@ -8,7 +8,7 @@ void SQLParser::setQuery(const std::string& query) {
     this->query = query;
 }
 
-std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery(const std::string& query) {
+std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery() {
     std::regex regex(R"(select (.*?) from (\w+))", std::regex::icase);
     std::smatch match;
     std::unordered_map<std::string, std::vector<std::string>> mp;
@@ -18,7 +18,7 @@ std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery
         std::string column_str = match[1]; // args after select
         std::string table_name = match[2]; // table names after from 
 
-        std::cout << "col names: " << column_str << std::endl;
+        //std::cout << "col names: " << column_str << std::endl;
 
         // splitting cols by comma, and stripping white space
         std::vector<std::string> columns;
@@ -43,4 +43,13 @@ std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery
     }
 
     return mp;
+}
+
+bool SQLParser::isSelect() const {
+    std::string trimmed_query = query;
+    trimmed_query.erase(0, trimmed_query.find_first_not_of(" \t\n\r"));
+    
+    return trimmed_query.size() >= 6 &&
+       std::equal(trimmed_query.begin(), trimmed_query.begin() + 6, "SELECT",
+                  [](char a, char b) { return std::toupper(a) == b; });
 }

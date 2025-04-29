@@ -16,5 +16,6 @@ public:
 
     const std::string getQuery() const;
     void setQuery(const std::string& query);
-    std::unordered_map<std::string, std::vector<std::string>> selectQuery(const std::string& query);
+    std::unordered_map<std::string, std::vector<std::string>> selectQuery();
+    bool isSelect() const;
 };

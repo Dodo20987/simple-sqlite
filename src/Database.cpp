@@ -154,15 +154,10 @@ void Database::printRowCount(const std::string& query) {
 }
 
 void Database::selectColumn(const std::string& query) {
-    std::istringstream iss(query);
-    std::vector<std::string> tokens;
-    std::string word;
     auto page_size = this->getPageSize();
-    while (iss >> word) {
-        tokens.push_back(word);
-    }
-    std::string table = tokens.back();
-    std::string column = tokens[1];
+    SQLParser string_parser(query);
+    std::unordered_map<std::string, std::vector<std::string>> tokens = string_parser.selectQuery();
+   
     char buf[2];
     database_file.seekg(HEADER_SIZE + 3);
     database_file.read(buf,2);
@@ -183,7 +178,6 @@ void Database::selectColumn(const std::string& query) {
         // first entry contains the serial type for type, and entry 2
         // contains the serial type for name
         database_file.read(record_header, cols - 1); // -1 because the size of the header is alredy read previously
-        
         std::vector<unsigned int> serial_types;
         int offset = 0;
         for (int j = 0; j < cols - 1; j++) {
@@ -214,7 +208,8 @@ void Database::selectColumn(const std::string& query) {
         size_t start = sql.find('(') + 1;
         size_t end = sql.find(')');
         std::string columns_def = sql.substr(start, end - start);
-        if (table_name == table ) {
+        std::string table_name_string(table_name);
+        if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
             std::istringstream col_stream(columns_def);
             std::string col;
             while(std::getline(col_stream, col, ',')) {
@@ -223,14 +218,19 @@ void Database::selectColumn(const std::string& query) {
                col_word_stream >> col_name;
                column_names.push_back(col_name);
             }
-
-            auto it = std::find(column_names.begin(), column_names.end(), column);
-            if (it == column_names.end()) {
-                std::cout << "Can't find the column in the given table" << std::endl;
-                return;
+            std::vector<std::vector<std::string>::iterator> matched_iterators;
+            std::vector<int> col_indices;
+            for (const auto& x : tokens["cols"]) {
+                auto it = std::find(column_names.begin(), column_names.end(), x);   
+                if (it != column_names.end()) {
+                    matched_iterators.push_back(it);
+                }
             }
-
-            int col_index = std::distance(column_names.begin(), it);
+            for (const auto& x : matched_iterators) {
+                int col_index = std::distance(column_names.begin(), x);
+                col_indices.push_back(col_index);
+            }
+            //int col_index = std::distance(column_names.begin(), it);
             int root_page = static_cast<unsigned char>(root[0]);
             int page_offset = (root_page - 1) * page_size;
             char buf[2];
@@ -275,22 +275,38 @@ void Database::selectColumn(const std::string& query) {
                 for(size_t m = 0; m < serial_types.size(); ++m) {
                     uint64_t stype = serial_types[m];
                     int size = 0;
-                    if (stype == 0) size = 0;                   // NULL
-                    else if (stype == 1) size = 1;
-                    else if (stype == 2) size = 2;
-                    else if (stype == 3) size = 3;
-                    else if (stype == 4) size = 4;
-                    else if (stype == 5) size = 6;
-                    else if (stype == 6) size = 8;
-                    else if (stype >= 13 && stype % 2 == 1) size = (stype - 13) / 2;
-                    else {
-                        std::cerr << "Unsupported serial type: " << stype << std::endl;
-                        return;
+                    switch(stype) {
+                        case 0:
+                            size = 0;
+                            break;
+                        case 1:
+                            size = 1;
+                            break;
+                        case 2:
+                            size = 2;
+                            break;
+                        case 3:
+                            size = 3;
+                            break;
+                        case 4:
+                            size = 4;
+                            break;
+                        case 5:
+                            size = 6;
+                            break;
+                        case 6:
+                            size = 8;
+                            break;
+                        default:
+                            if(stype >= 13 && stype % 2 == 1) size = (stype - 13) / 2;
+                            else {
+                                std::cerr << "Unsupported serial type: " << stype << std::endl;
+                                return;
+                            }
+                            break;
                     }
-
                     std::vector<char> data(size);
                     database_file.read(data.data(), size);
-
 
                     if (stype >= 13) {
                         column_values.emplace_back(data.data(), size); // TEXT
@@ -302,12 +318,20 @@ void Database::selectColumn(const std::string& query) {
                         column_values.push_back(ss.str()); // store raw bytes as hex string for debugging
                     }
                 }
-
-                if (col_index < column_values.size()) {
-                    std::cout << column_values[col_index] << std::endl;
-                } else {
-                    std::cout << "Row " << k << ": [column index out of bounds]" << std::endl;
+                bool is_first_iteration = true;
+                for (int col_index : col_indices) {
+                    if (col_index < column_values.size()) {
+                        if (is_first_iteration) {
+                            std::cout << column_values[col_index];
+                            is_first_iteration = false;
+                        }
+                        else
+                            std::cout << "|" << column_values[col_index];
+                    } else {
+                        std::cout << "Row " << k << ": [column index out of bounds]" << std::endl;
+                    }
                 }
+                std::cout << std::endl;
             }
             break;
         }

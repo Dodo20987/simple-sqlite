@@ -7,6 +7,8 @@
 #include <vector>
 #include <algorithm>
 #include <iomanip>
+#include "../include/SQLParser.h"
+#include <unordered_map>
 
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;

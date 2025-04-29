@@ -7,8 +7,23 @@
 #include <sstream>
 #include <algorithm>
 #include <cstdint>
+#include <unordered_map>
 #include "../include/Database.h"
+#include "../include/SQLParser.h"
 
+void string_parse_test(const std::string& query) {
+    SQLParser sql(query);
+    auto res = sql.selectQuery();
+    std::cout << "col_names: " << std::endl;
+    for (const auto& x : res["cols"]) {
+        std::cout << x << std::endl;
+    }
+    std::cout << "table names: " << std::endl;
+
+    for (const auto& x : res["tables"]) {
+        std::cout << x << std::endl;
+    }
+}
 //TODO: instead of parsing the sql query by position use regex on the query
 int main(int argc, char* argv[]) {
     // Flush after every std::cout / std::cerr
@@ -22,7 +37,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Expected two arguments" << std::endl;
         return 1;
     }
-
+    //std::string query = "SELECT name, color FROM apples";
+    //string_parse_test(query);
     std::string database_file_path = argv[1];
     std::string command = argv[2];
     std::ifstream database_file(database_file_path, std::ios::binary);
