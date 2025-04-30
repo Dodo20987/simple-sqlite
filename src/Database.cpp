@@ -30,6 +30,9 @@ unsigned int Database::parseVarint(const unsigned char* data, int& bytes_read) c
     return result;
 
 }
+bool Database::matchesWhereCondition(std::vector<std::string>& values, const std::string& operation, const std::string& condition) const {
+
+}
 
 const unsigned short Database::getPageSize() const {
     std::streampos original_position = database_file.tellg();

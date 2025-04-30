@@ -8,12 +8,69 @@ void SQLParser::setQuery(const std::string& query) {
     this->query = query;
 }
 
+std::string SQLParser::extractWhereClause() {
+    std::string upper_query = query;
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    size_t pos = upper_query.find("WHERE");
+    if(pos == std::string::npos) {
+        return "";
+    }
+    return query.substr(pos + 5);
+}
+WhereCondition SQLParser::parseCondition(const std::string& expr) {
+    static const std::vector<std::string> operators = { ">=", "<=", "!=", "=", "<", ">" };
+    for (const auto& op : operators) {
+        size_t pos = expr.find(op);
+        if(pos != std::string::npos) {
+            std::string col = expr.substr(0,pos);
+            std::string val = expr.substr(pos + op.size());
+             // Trim whitespace
+            auto trim = [](std::string& s) {
+                size_t start = s.find_first_not_of(" \t\n");
+                size_t end = s.find_last_not_of(" \t\n");
+                s = (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+            };
+            trim(col);
+            trim(val);
+            // Remove quotes from value if present
+            if (!val.empty() && val.front() == '\'' && val.back() == '\'') {
+                val = val.substr(1, val.size() - 2);
+            }
+
+            return { col, op, val };
+        }
+    }
+}
+WhereClause SQLParser::parseWhereClause() {
+    std::string where_statement = this->extractWhereClause();
+    WhereClause clause;
+    std::istringstream iss(where_statement);
+    std::string token;
+    std::string current;
+
+    while(iss >> token) {
+        if (token == "AND" || token == "OR") {
+            clause.conditions.push_back(parseCondition(current));
+            clause.logic.push_back(token == "AND" ? LogicalOp::AND : LogicalOp::OR);
+            current.clear();
+        }
+        else {
+            if(!current.empty()) current += " ";
+            current += token;
+        }
+    }
+    if(!current.empty()) {
+        clause.conditions.push_back(parseCondition(current));
+    }
+    return clause;
+}
 std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery() {
     std::regex regex(R"(select (.*?) from (\w+))", std::regex::icase);
     std::smatch match;
     std::unordered_map<std::string, std::vector<std::string>> mp;
     mp["cols"] = {};
     mp["tables"] = {};
+    mp["filter"] = {};
     if(std::regex_match(query, match, regex)) {
         std::string column_str = match[1]; // args after select
         std::string table_name = match[2]; // table names after from 
