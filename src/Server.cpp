@@ -24,6 +24,9 @@ void string_parse_test(const std::string& query) {
         std::cout << x << std::endl;
     }
 }
+void accept_input() {
+    std::cout << "sqlite> ";
+}
 //TODO: instead of parsing the sql query by position use regex on the query
 int main(int argc, char* argv[]) {
     // Flush after every std::cout / std::cerr
@@ -41,25 +44,33 @@ int main(int argc, char* argv[]) {
     //string_parse_test(query);
     std::string database_file_path = argv[1];
     std::string command = argv[2];
-    std::ifstream database_file(database_file_path, std::ios::binary);
-    if (!database_file) {
-        std::cerr << "Failed to open the database file" << std::endl;
-        return 0;
-    }
+    std::string input;
+    while(true) {
+        accept_input();
+        std::getline(std::cin, input);
+        std::ifstream database_file(database_file_path, std::ios::binary);
+        if (!database_file) {
+            std::cerr << "Failed to open the database file" << std::endl;
+            return 0;
+        }
 
-    Database d1(std::move(database_file));
-    if (command == ".dbinfo") {
-        d1.printDBInfo();
-    }
-    else if (command == ".tables") {
-        d1.printTables();
-    }
-    else {
-        if(d1.isCount(command)) {
-            d1.printRowCount(command);
+        Database d1(std::move(database_file));
+        if (input == ".dbinfo") {
+            d1.printDBInfo();
+        }
+        else if (input == ".tables") {
+            d1.printTables();
+        }
+        else if(input == ".exit") {
+            break;
         }
         else {
-            d1.selectColumn(command);
+            if(d1.isCount(input)) {
+                d1.printRowCount(input);
+            }
+            else {
+                d1.selectColumn(input);
+            }
         }
     }
 

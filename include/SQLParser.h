@@ -6,7 +6,12 @@
 #include <vector>
 #include <sstream>
 #include <unordered_map>
-
+enum {
+    COUNT = 0,
+    SELECT = 1,
+    INSERT = 2,
+    
+};
 class SQLParser {
 private:
     std::string query;
