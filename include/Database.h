@@ -18,8 +18,11 @@ private:
     mutable std::ifstream database_file;
     unsigned int parseVarint(const unsigned char* data, int& bytes_read) const;
     const unsigned short getPageSize() const;
-    bool matchesWhereCondition(std::vector<std::string>& value, const std::string& operation, const std::string& condition) const;
+    bool matchesWhereCondition(const std::string& value, const std::string& operation, const std::string& condition) const;
+    bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row);
+    bool evaluateCondition(const WhereCondition& cond, const std::unordered_map<std::string, std::string>& row);
     void parseSQL(const std::string& query);
+    void navigateToRows();
 public:
     Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
     const std::streampos getFileSize() const;
@@ -27,6 +30,7 @@ public:
     void printDBInfo();
     void printRowCount(const std::string& query);
     void selectColumn(const std::string& query);
+    void selectColumnWithWhere(const std::string &query);
     bool isCount(const std::string& query) const;
 
 

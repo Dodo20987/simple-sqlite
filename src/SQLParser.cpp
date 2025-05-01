@@ -8,7 +8,7 @@ void SQLParser::setQuery(const std::string& query) {
     this->query = query;
 }
 
-std::string SQLParser::extractWhereClause() {
+std::string SQLParser::extractWhereClause() const {
     std::string upper_query = query;
     std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
     size_t pos = upper_query.find("WHERE");
@@ -17,7 +17,7 @@ std::string SQLParser::extractWhereClause() {
     }
     return query.substr(pos + 5);
 }
-WhereCondition SQLParser::parseCondition(const std::string& expr) {
+WhereCondition SQLParser::parseCondition(const std::string& expr) const {
     static const std::vector<std::string> operators = { ">=", "<=", "!=", "=", "<", ">" };
     for (const auto& op : operators) {
         size_t pos = expr.find(op);
@@ -40,8 +40,9 @@ WhereCondition SQLParser::parseCondition(const std::string& expr) {
             return { col, op, val };
         }
     }
+    return {"","",""};
 }
-WhereClause SQLParser::parseWhereClause() {
+WhereClause SQLParser::parseWhereClause() const {
     std::string where_statement = this->extractWhereClause();
     WhereClause clause;
     std::istringstream iss(where_statement);
@@ -64,7 +65,7 @@ WhereClause SQLParser::parseWhereClause() {
     }
     return clause;
 }
-std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery() {
+std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery() const {
     std::regex regex(R"(select (.*?) from (\w+))", std::regex::icase);
     std::smatch match;
     std::unordered_map<std::string, std::vector<std::string>> mp;

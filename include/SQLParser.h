@@ -28,15 +28,15 @@ struct WhereClause {
 class SQLParser {
 private:
     std::string query;
-    std::string extractWhereClause();
+    std::string extractWhereClause() const;
+    WhereCondition parseCondition(const std::string& expr) const;
 public:
     SQLParser() : query("") {}
     SQLParser(const std::string& query) : query(query) {}
     bool isWhereClause() const;
-    WhereCondition parseCondition(const std::string& expr);
-    WhereClause parseWhereClause();
+    WhereClause parseWhereClause() const;
     const std::string getQuery() const;
     void setQuery(const std::string& query);
-    std::unordered_map<std::string, std::vector<std::string>> selectQuery();
+    std::unordered_map<std::string, std::vector<std::string>> selectQuery() const;
     bool isSelect() const;
 };
