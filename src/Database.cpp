@@ -16,17 +16,28 @@ bool Database::isCount(const std::string& query) const {
     return upper_query.find("COUNT(") != std::string::npos;
 }
 
-unsigned int Database::parseVarint(const unsigned char* data, int& bytes_read) const {
-    unsigned int result = 0;
+bool Database::hasWhereClause(const std::string& query) const {
+    std::regex where_pattern(R"(\bwhere\b)", std::regex_constants::icase);
+    bool res = std::regex_search(query, where_pattern);
+    return res;
+}
+int64_t Database::parseVarint(const unsigned char* data, int& bytes_read) const {
+    int64_t result = 0;
     bytes_read = 0;
-    
-    for (int i = 0; i < 9; ++i) {
+
+    for (int i = 0; i < 8; i++) {
         result = (result << 7) | (data[i] & 0x7F);
-        ++bytes_read;
-        if (!(data[i] & 0x80)) {
-            break; // MSB not set = last byte
+        bytes_read++;
+        if ((data[i] & 0x80) == 0) {
+            //std::cout << "i: " << i << std::endl;
+            return result;
         }
     }
+
+    // Special case: 9th byte is stored as full 8 bits
+    result = (result << 8) | data[8];
+    bytes_read = 9;
+    std::cout << "res: " << std::endl;
     return result;
 
 }
@@ -35,6 +46,7 @@ bool Database::evaluateCondition(const WhereCondition& cond, const std::unordere
     if (it == row.end()) return false; // col does not exist
 
     const std::string& val = it->second;
+    //std::cout << "val: " << val << std::endl;
     if (cond.operation == "=") return val == cond.value;
     if (cond.operation == "!=") return val != cond.value;
     if (cond.operation == "<") return std::stod(val) < std::stod(cond.value);
@@ -50,7 +62,11 @@ bool Database::evaluateWhere(const WhereClause& where, const std::unordered_map<
     if (where.conditions.empty()) return true;
     
     bool result = evaluateCondition(where.conditions[0], row);
+    //std::cout << "logic size" << where.logic.size() << std::endl;
+    //std::cout << "cond: " << "{" << where.conditions[0].column << where.conditions[0].operation << where.conditions[0].value << "}" << std::endl;
+    //std::cout << "res" << result << std::endl;
     for (size_t i = 0; i < where.logic.size(); i++) {
+        //std::cout << "cond: " << "{" << where.conditions[i].column << where.conditions[i].operation << where.conditions[i].value << "}" << std::endl;
         bool next = evaluateCondition(where.conditions[i + 1], row);
         if (where.logic[i] == LogicalOp::AND) result = result && next;
         else result = result || next;
@@ -81,6 +97,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
 
         // first entry contains the serial type for type, and entry 2
         // contains the serial type for name
+
         database_file.read(record_header, cols - 1); // -1 because the size of the header is alredy read previously
         std::vector<unsigned int> serial_types;
         int offset = 0;
@@ -90,52 +107,62 @@ void Database::selectColumnWithWhere(const std::string& query) {
             serial_types.push_back(serial_type);
             offset += bytes_read;
         }
-        std::vector<unsigned short> serial_sizes;
-        for(int k = 0; k < 4; k++) {
-            unsigned short size = (static_cast<unsigned short>(serial_types[i]) - 13) / 2;
-            serial_sizes.push_back(size);
-        }
+        unsigned short type_size = (static_cast<unsigned short>(serial_types[0]) - 13) / 2;
+        unsigned short name_size = (static_cast<unsigned short>(serial_types[1]) - 13) / 2;
+        unsigned short tbl_name_size = (static_cast<unsigned short>(serial_types[2]) - 13) / 2;
+        unsigned short root_size = static_cast<unsigned short>(serial_types[3]);
+        unsigned short sql_size = (static_cast<unsigned short>(serial_types[4]) - 13) / 2;
         
-        char type_name[serial_sizes[0]];
-        char table_name[serial_sizes[1]];
-        char tbl[serial_sizes[2]];
-        char root[serial_sizes[3]];
-        char sql_text[serial_sizes[4]];
+        char type_name[type_size];
+        char table_name[name_size];
+        char tbl[tbl_name_size];
+        char root[root_size];
+        char sql_text[sql_size];
         //unsigned short root_page = static_cast<unsigned short>(root[0]);
-        database_file.read(type_name, serial_sizes[0]);
-        database_file.read(table_name, serial_sizes[1]);
-        database_file.read(tbl, serial_sizes[2]);
-        database_file.read(root, serial_sizes[3]);
-        database_file.read(sql_text, serial_sizes[4]);
+        database_file.read(type_name, type_size);
+        database_file.read(table_name, name_size);
+        database_file.read(tbl, tbl_name_size);
+        database_file.read(root, root_size);
+        database_file.read(sql_text, sql_size);
         std::vector<std::string> column_names;
-        std::string sql(sql_text, serial_sizes[4]);
+        std::string sql(sql_text, sql_size);
         size_t start = sql.find('(') + 1;
         size_t end = sql.find(')');
+        /*
+        std::cout << "sql size: " << sql_size << std::endl;
+        std::cout << sql << std::endl;*/
         std::string columns_def = sql.substr(start, end - start);
+        //std::cout << columns_def << std::endl;
         std::string table_name_string(table_name);
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
             std::istringstream col_stream(columns_def);
             std::string col;
-            //TODO: need to map the col index to the actual name using a hash map
             while(std::getline(col_stream, col, ',')) {
                std::istringstream col_word_stream(col);
                std::string col_name;
                col_word_stream >> col_name;
                column_names.push_back(col_name);
+               //std::cout << "col: " << col_name << std::endl;
             }
             std::unordered_map<int, std::string> index_to_name;
             std::vector<std::vector<std::string>::iterator> matched_iterators;
+            std::vector<int> desired_col_indices;
             std::vector<int> col_indices;
             for (const auto& x : tokens["cols"]) {
                 auto it = std::find(column_names.begin(), column_names.end(), x);   
                 if (it != column_names.end()) {
                     matched_iterators.push_back(it);
                 }
+                //std::cout << "it: " << *it << std::endl;
             }
             for (const auto& x : matched_iterators) {
                 int col_index = std::distance(column_names.begin(), x);
-                col_indices.push_back(col_index);
-                index_to_name[col_index] = *x;
+                desired_col_indices.push_back(col_index);
+                //std::cout << "name: " << *x << std::endl;
+            }
+            for (size_t i = 0; i < column_names.size(); ++i) {
+                col_indices.push_back(i);
+                index_to_name[i] = column_names[i];
             }
 
             int root_page = static_cast<unsigned char>(root[0]);
@@ -158,7 +185,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 offset += bytes;
                 uint64_t rowid = this->parseVarint(varint_buf + offset, bytes);
                 offset += bytes;
-     
                 database_file.seekg(page_offset + offset + cell_offset);
                 database_file.read(reinterpret_cast<char*>(varint_buf), 9);
                 offset = 0;
@@ -167,7 +193,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 std::vector<unsigned char> header(header_size - offset);
                 database_file.seekg(-(9 - offset), std::ios::cur);
                 // -1 because we're off by 1 when reading
-                database_file.read(reinterpret_cast<char*>(header.data()), header_size - 1);
+                database_file.read(reinterpret_cast<char*>(header.data()), header_size - offset);
 
                 std::vector<uint64_t> serial_types;
                 int h_offset = 0;
@@ -175,13 +201,17 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 while(h_offset < header.size()) {
                     uint64_t serial_type = this->parseVarint(&header[h_offset], bytes);
                     serial_types.push_back(serial_type);
+                    //std::cout << serial_type << ", ";
                     h_offset += bytes;
                 }
+                //std::cout << std::endl;
 
                 std::vector<std::string> column_values;
                 for(size_t m = 0; m < serial_types.size(); ++m) {
                     uint64_t stype = serial_types[m];
+                    //std::vector<char> data;
                     int size = 0;
+                    //TODO: numbers are currently displayed as hexadecimal must convert to decimal
                     switch(stype) {
                         case 0:
                             size = 0;
@@ -204,6 +234,17 @@ void Database::selectColumnWithWhere(const std::string& query) {
                         case 6:
                             size = 8;
                             break;
+                        /*
+                        case 8:
+                            size = 0;
+                            data.resize(size);
+                            handleSerial8(data);
+                            break;
+                        case 9:
+                            size = 1;
+                            data.resize(size);
+                            handleSerial9(data);
+                            break;*/
                         default:
                             if(stype >= 13 && stype % 2 == 1) size = (stype - 13) / 2;
                             else {
@@ -214,7 +255,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
                     }
                     std::vector<char> data(size);
                     database_file.read(data.data(), size);
-
                     if (stype >= 13) {
                         column_values.emplace_back(data.data(), size); // TEXT
                     } else {
@@ -222,32 +262,30 @@ void Database::selectColumnWithWhere(const std::string& query) {
                         for (int k = 0; k < size; ++k) {
                             ss << std::hex << std::setfill('0') << std::setw(2) << (0xff & static_cast<unsigned char>(data[k]));
                         }
+                        //TODO: having trouble printing id the int currently
                         column_values.push_back(ss.str()); // store raw bytes as hex string for debugging
                     }
                 }
                 bool is_first_iteration = true;
                 std::unordered_map<std::string, std::string> row;
-                // TODO: fill in the WhereClause
                 WhereClause where = string_parser.parseWhereClause();
                 for (int col_index : col_indices) {
                     if (col_index < column_values.size()) {
                         row[index_to_name[col_index]] = column_values[col_index];
                     }
-                        /*
-                        if (is_first_iteration) {
-                            std::cout << column_values[col_index];
+                }
+
+                if(evaluateWhere(where, row)) {
+                    for(const auto& val : row) {
+                        if(is_first_iteration) {
+                            std::cout << val.second;
                             is_first_iteration = false;
                         }
-                        else
-                            std::cout << "|" << column_values[col_index];
-                    } else {
-                        std::cout << "Row " << k << ": [column index out of bounds]" << std::endl;
-                    }*/
+                        else std::cout << "|" << val.second;
+                    }
+                    std::cout << std::endl;
                 }
-                if(evaluateWhere(where, row)) {
-                    //do something
-                }
-                std::cout << std::endl;
+
             }
             break;
         }
@@ -312,6 +350,7 @@ void Database::selectColumn(const std::string& query) {
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
             std::istringstream col_stream(columns_def);
             std::string col;
+            //TODO: must extract all col names from the actual create table statement
             while(std::getline(col_stream, col, ',')) {
                std::istringstream col_word_stream(col);
                std::string col_name;

@@ -9,14 +9,14 @@
 #include <iomanip>
 #include "../include/SQLParser.h"
 #include <unordered_map>
-
+#include "./serialHelper.h"
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;
 
 class Database {
 private:
     mutable std::ifstream database_file;
-    unsigned int parseVarint(const unsigned char* data, int& bytes_read) const;
+    int64_t parseVarint(const unsigned char* data, int& bytes_read) const;
     const unsigned short getPageSize() const;
     bool matchesWhereCondition(const std::string& value, const std::string& operation, const std::string& condition) const;
     bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row);
@@ -32,6 +32,6 @@ public:
     void selectColumn(const std::string& query);
     void selectColumnWithWhere(const std::string &query);
     bool isCount(const std::string& query) const;
-
+    bool hasWhereClause(const std::string& query) const;
 
 };

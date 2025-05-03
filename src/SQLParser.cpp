@@ -66,17 +66,15 @@ WhereClause SQLParser::parseWhereClause() const {
     return clause;
 }
 std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery() const {
-    std::regex regex(R"(select (.*?) from (\w+))", std::regex::icase);
+    //std::regex regex(R"(select (.*?) from (\w+))", std::regex::icase);
+    std::regex regex(R"(select\s+(.*?)\s+from\s+(\w+))", std::regex::icase);
     std::smatch match;
     std::unordered_map<std::string, std::vector<std::string>> mp;
     mp["cols"] = {};
     mp["tables"] = {};
-    mp["filter"] = {};
-    if(std::regex_match(query, match, regex)) {
+    if(std::regex_search(query, match, regex)) {
         std::string column_str = match[1]; // args after select
         std::string table_name = match[2]; // table names after from 
-
-        //std::cout << "col names: " << column_str << std::endl;
 
         // splitting cols by comma, and stripping white space
         std::vector<std::string> columns;
@@ -110,4 +108,13 @@ bool SQLParser::isSelect() const {
     return trimmed_query.size() >= 6 &&
        std::equal(trimmed_query.begin(), trimmed_query.begin() + 6, "SELECT",
                   [](char a, char b) { return std::toupper(a) == b; });
+}
+
+bool SQLParser::isWhereClause() const {
+    std::cout << "checking" << std::endl;
+    std::string upper_query = query;
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    bool result = upper_query.find("WHERE") != std::string::npos;
+    std::cout << "res : " << result << std::endl;
+    return result;
 }

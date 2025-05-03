@@ -55,6 +55,7 @@ int main(int argc, char* argv[]) {
         }
 
         Database d1(std::move(database_file));
+        SQLParser s1(command);
         if (input == ".dbinfo") {
             d1.printDBInfo();
         }
@@ -67,6 +68,9 @@ int main(int argc, char* argv[]) {
         else {
             if(d1.isCount(input)) {
                 d1.printRowCount(input);
+            }
+            else if(d1.hasWhereClause(input))  {
+                d1.selectColumnWithWhere(input);
             }
             else {
                 d1.selectColumn(input);
