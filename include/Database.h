@@ -19,10 +19,13 @@ private:
     int64_t parseVarint(const unsigned char* data, int& bytes_read) const;
     const unsigned short getPageSize() const;
     bool matchesWhereCondition(const std::string& value, const std::string& operation, const std::string& condition) const;
-    bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row);
-    bool evaluateCondition(const WhereCondition& cond, const std::unordered_map<std::string, std::string>& row);
-    void parseSQL(const std::string& query);
+    bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row) const;
+    bool evaluateCondition(const WhereCondition& cond, const std::unordered_map<std::string, std::string>& row) const;
+    void parseSQL(const std::string& query) const;
     void navigateToRows();
+    std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types) const;
+    const unsigned short extractNumberOfRows() const;
+    void computeSerialSize() const;
 public:
     Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
     const std::streampos getFileSize() const;

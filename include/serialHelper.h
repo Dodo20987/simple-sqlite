@@ -6,8 +6,9 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <string>
 
-void handleInt(const std::vector<char>& data, int size);
-void handleFloat(const std::vector<char>& data,int size);
-void handleSerial9(const std::vector<char>& data);
-void handleSerial8(const std::vector<char>& data);
+const std::string handleInt(const std::vector<char>& data, int size);
+const std::string handleFloat(const std::vector<char>& data, int size);
+const std::string handleSerial9(const std::vector<char>& data);
+const std::string handleSerial8(const std::vector<char>& data);

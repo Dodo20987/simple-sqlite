@@ -36,14 +36,14 @@ int main(int argc, char* argv[]) {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     std::cerr << "Logs from your program will appear here" << std::endl;
 
-    if (argc != 3) {
+    if (argc != 2) {
         std::cerr << "Expected two arguments" << std::endl;
         return 1;
     }
     //std::string query = "SELECT name, color FROM apples";
     //string_parse_test(query);
     std::string database_file_path = argv[1];
-    std::string command = argv[2];
+    //std::string command = argv[2];
     std::string input;
     while(true) {
         accept_input();
@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
         }
 
         Database d1(std::move(database_file));
-        SQLParser s1(command);
+        //SQLParser s1(command);
         if (input == ".dbinfo") {
             d1.printDBInfo();
         }
