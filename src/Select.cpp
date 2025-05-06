@@ -6,7 +6,6 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
         uint64_t stype = serial_types[m];
         //std::vector<char> data;
         int size = 0;
-        //TODO: numbers are currently displayed as hexadecimal must convert to decimal
         switch(stype) {
             case 0:
                 size = 0;
@@ -59,10 +58,10 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
                 column_values.emplace_back(handleFloat(data, size));
             }
             else if (stype == 8)  {
-                column_values.emplace_back(handleSerial8(data));
+                column_values.emplace_back(handleSerial8());
             }
             else if (stype == 9) {
-                column_values.emplace_back(handleSerial9(data));
+                column_values.emplace_back(handleSerial9());
             }
             else {
                 column_values.push_back(ss.str());
@@ -75,10 +74,26 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
 
 const unsigned short Database::extractNumberOfRows() const {
 
-}
-void Database::computeSerialSize() const {
+} 
 
+void Database::computeSchemaSize(const char* record_header,unsigned short size, unsigned short &type_size,
+unsigned short &name_size, unsigned short &tbl_name_size, unsigned short &root_size,
+unsigned short &sql_size ) const {
+    std::vector<unsigned int> serial_types;
+    int offset = 0;
+    for (int j = 0; j < size; j++) {
+        int bytes_read = 0;
+        unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);
+        serial_types.push_back(serial_type);
+        offset += bytes_read;
+    }
+    type_size = (static_cast<unsigned short>(serial_types[0]) - 13) / 2;
+    name_size = (static_cast<unsigned short>(serial_types[1]) - 13) / 2;
+    tbl_name_size = (static_cast<unsigned short>(serial_types[2]) - 13) / 2;
+    root_size = static_cast<unsigned short>(serial_types[3]);
+    sql_size = (static_cast<unsigned short>(serial_types[4]) - 13) / 2;
 }
+
 void Database::selectColumnWithWhere(const std::string& query) {
     auto page_size = this->getPageSize();
     SQLParser string_parser(query);
@@ -105,20 +120,9 @@ void Database::selectColumnWithWhere(const std::string& query) {
         // contains the serial type for name
 
         database_file.read(record_header, cols - 1); // -1 because the size of the header is alredy read previously
-        std::vector<unsigned int> serial_types;
-        int offset = 0;
-        for (int j = 0; j < cols - 1; j++) {
-            int bytes_read = 0;
-            unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);
-            serial_types.push_back(serial_type);
-            offset += bytes_read;
-        }
-        unsigned short type_size = (static_cast<unsigned short>(serial_types[0]) - 13) / 2;
-        unsigned short name_size = (static_cast<unsigned short>(serial_types[1]) - 13) / 2;
-        unsigned short tbl_name_size = (static_cast<unsigned short>(serial_types[2]) - 13) / 2;
-        unsigned short root_size = static_cast<unsigned short>(serial_types[3]);
-        unsigned short sql_size = (static_cast<unsigned short>(serial_types[4]) - 13) / 2;
-        
+        unsigned short type_size, name_size, tbl_name_size, root_size, sql_size; 
+        this->computeSchemaSize(record_header, cols - 1, type_size, name_size, tbl_name_size, root_size, sql_size);
+
         char type_name[type_size];
         char table_name[name_size];
         char tbl[tbl_name_size];
@@ -253,19 +257,8 @@ void Database::selectColumn(const std::string& query) {
         // first entry contains the serial type for type, and entry 2
         // contains the serial type for name
         database_file.read(record_header, cols - 1); // -1 because the size of the header is alredy read previously
-        std::vector<unsigned int> serial_types;
-        int offset = 0;
-        for (int j = 0; j < cols - 1; j++) {
-            int bytes_read = 0;
-            unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);
-            serial_types.push_back(serial_type);
-            offset += bytes_read;
-        }
-        unsigned short type_size = (static_cast<unsigned short>(serial_types[0]) - 13) / 2;
-        unsigned short name_size = (static_cast<unsigned short>(serial_types[1]) - 13) / 2;
-        unsigned short tbl_name_size = (static_cast<unsigned short>(serial_types[2]) - 13) / 2;
-        unsigned short root_size = static_cast<unsigned short>(serial_types[3]);
-        unsigned short sql_size = (static_cast<unsigned short>(serial_types[4]) - 13) / 2;
+        unsigned short type_size, name_size, tbl_name_size, root_size, sql_size; 
+        this->computeSchemaSize(record_header, cols - 1, type_size, name_size, tbl_name_size, root_size, sql_size);
         
         char type_name[type_size];
         char table_name[name_size];
@@ -287,7 +280,6 @@ void Database::selectColumn(const std::string& query) {
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
             std::istringstream col_stream(columns_def);
             std::string col;
-            //TODO: must extract all col names from the actual create table statement
             while(std::getline(col_stream, col, ',')) {
                std::istringstream col_word_stream(col);
                std::string col_name;
@@ -306,7 +298,6 @@ void Database::selectColumn(const std::string& query) {
                 int col_index = std::distance(column_names.begin(), x);
                 col_indices.push_back(col_index);
             }
-            //int col_index = std::distance(column_names.begin(), it);
             int root_page = static_cast<unsigned char>(root[0]);
             int page_offset = (root_page - 1) * page_size;
             char buf[2];

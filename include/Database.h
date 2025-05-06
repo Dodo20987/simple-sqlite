@@ -25,7 +25,8 @@ private:
     void navigateToRows();
     std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types) const;
     const unsigned short extractNumberOfRows() const;
-    void computeSerialSize() const;
+    void computeSchemaSize(const char* record_header,unsigned short size, unsigned short& type_size, unsigned short& name_size, 
+        unsigned short& tbl_name_size, unsigned short& root_size,unsigned short& sql_size) const;
 public:
     Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
     const std::streampos getFileSize() const;
