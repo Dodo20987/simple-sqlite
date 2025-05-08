@@ -1,5 +1,186 @@
 #include "../include/Database.h"
 
+TableB Database::getPageType(uint32_t page_number) const {
+    int page_size = this->getPageSize();
+    database_file.seekg(page_number * page_size);
+
+    unsigned char page_type_byte;
+    database_file.read(reinterpret_cast<char*>(page_type_byte), 1);
+
+    switch (page_type_byte) {
+        case 0x0d:
+            return TableB::leafCell;
+        case 0x02:
+            return TableB::interiorCell;
+        default:
+            return TableB::unknown;
+    };
+}
+void Database::traverseBTreePage(uint32_t page_number) {
+    TableB page_type = this->getPageType(page_number);
+    switch(page_type) {
+        case TableB::leafCell:
+            // do something
+            break;
+        case TableB::interiorCell:
+            // do something
+            break;
+        default:
+            return;
+    };
+
+}
+
+std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types) const {
+    std::vector<std::string> column_values;
+    for(size_t m = 0; m < serial_types.size(); ++m) {
+        uint64_t stype = serial_types[m];
+        //std::vector<char> data;
+        int size = 0;
+        switch(stype) {
+            case 0:
+                size = 0;
+                break;
+            case 1:
+                size = 1;
+                break;
+            case 2:
+                size = 2;
+                break;
+            case 3:
+                size = 3;
+                break;
+            case 4:
+                size = 4;
+                break;
+            case 5:
+                size = 6;
+                break;
+            case 6:
+                size = 8;
+                break;
+            case 8:
+                size = 0;
+                break;
+            case 9:
+                size = 0;
+                break;
+            default:
+                if(stype >= 13 && stype % 2 == 1) size = (stype - 13) / 2;
+                else {
+                    std::cerr << "Unsupported serial type: " << stype << std::endl;
+                    return {};
+                }
+                break;
+        }
+        std::vector<char> data(size);
+        database_file.read(data.data(), size);
+        if (stype >= 13) {
+            column_values.emplace_back(data.data(), size); // TEXT
+        } else {
+            std::stringstream ss;
+            for (int k = 0; k < size; ++k) {
+                ss << std::hex << std::setfill('0') << std::setw(2) << (0xff & static_cast<unsigned char>(data[k]));
+            }
+            if (stype >= 1 && stype <= 6) {
+                column_values.emplace_back(handleInt(data,size));
+            }
+            else if (stype == 7) {
+                column_values.emplace_back(handleFloat(data, size));
+            }
+            else if (stype == 8)  {
+                column_values.emplace_back(handleSerial8());
+            }
+            else if (stype == 9) {
+                column_values.emplace_back(handleSerial9());
+            }
+            else {
+                column_values.push_back(ss.str());
+            }
+        }
+    }
+
+    return column_values;
+}
+
+unsigned short Database::extractNumberOfRows(const std::string& columns_def, const std::unordered_map<std::string, std::vector<std::string>> tokens, const char* root, unsigned short page_size) const {
+
+}
+std::vector<uint64_t> Database::computeSerialTypes(unsigned short page_offset, char* buf, int index) const {
+    database_file.seekg(page_offset + PAGE_SIZE + (index * 2));
+    database_file.read(buf,2);
+    unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
+    database_file.seekg(page_offset + cell_offset);
+    unsigned char varint_buf[9];
+    database_file.read(reinterpret_cast<char*>(varint_buf), 9); 
+
+    int offset = 0;
+    int bytes;
+    uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
+    offset += bytes;
+    uint64_t rowid = this->parseVarint(varint_buf + offset, bytes);
+    offset += bytes;
+     
+    database_file.seekg(page_offset + offset + cell_offset);
+    database_file.read(reinterpret_cast<char*>(varint_buf), 9);
+    offset = 0;
+    uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
+    offset += bytes;
+    std::vector<unsigned char> header(header_size - offset);
+    database_file.seekg(-(9 - offset), std::ios::cur);
+    // -1 because we're off by 1 when reading
+    database_file.read(reinterpret_cast<char*>(header.data()), header_size - 1);
+
+    std::vector<uint64_t> serial_types;
+    int h_offset = 0;
+
+    while(h_offset < header.size()) {
+        uint64_t serial_type = this->parseVarint(&header[h_offset], bytes);
+        serial_types.push_back(serial_type);
+        h_offset += bytes;
+    }
+
+    return serial_types;
+}
+
+void Database::computeSchemaSize(const char* record_header,
+    unsigned short size, 
+    unsigned short &type_size,
+    unsigned short &name_size, 
+    unsigned short &tbl_name_size, 
+    unsigned short &root_size, 
+    unsigned short &sql_size ) const {
+    std::vector<unsigned int> serial_types;
+    int offset = 0;
+    //std::cout << "header size : " << size << std::endl;
+    /*
+    for (int j = 0; j < size; j++) {
+        int bytes_read = 0;
+        unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);
+        serial_types.push_back(serial_type);
+        offset += bytes_read;
+        std::cout << "t: " << bytes_read << " " << (static_cast<unsigned short>(serial_type) - 13) / 2 << std::endl;
+    }*/
+    while(offset < size) {
+        int bytes_read = 0;
+        unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);
+        serial_types.push_back(serial_type);
+        offset += bytes_read;
+        int display = (serial_type >= 13) ? ((static_cast<unsigned short>(serial_type) - 13) / 2) : -1;
+        std::cout << "raw serial_type: " << serial_type 
+              << ", bytes_read: " << bytes_read 
+              << ", size guess: " << ((serial_type >= 13) ? ((serial_type - 13) / 2) : -1) 
+              << std::endl;
+        std::cout << "t: " << bytes_read << " " << display << std::endl;
+    }
+    std::cout << "vec size: " << serial_types.size() << std::endl;
+    type_size = (static_cast<unsigned short>(serial_types[0]) - 13) / 2;
+    name_size = (static_cast<unsigned short>(serial_types[1]) - 13) / 2;
+    tbl_name_size = (static_cast<unsigned short>(serial_types[2]) - 13) / 2;
+    root_size = static_cast<unsigned short>(serial_types[3]);
+    sql_size = (static_cast<unsigned short>(serial_types[4]) - 13) / 2;
+}
+
 const std::streampos Database::getFileSize() const {
     std::streampos original_pos = database_file.tellg();
     

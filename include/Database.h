@@ -12,6 +12,17 @@
 #include "./serialHelper.h"
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;
+enum class TableB {
+    leafCell = 0x0d,
+    interiorCell = 0x05,
+    unknown = 0
+};
+enum class IndexB {
+    leafCell = 0x0a,
+    interiorCell = 0x02,
+    unknown = 0
+};
+
 
 class Database {
 private:
@@ -24,9 +35,14 @@ private:
     void parseSQL(const std::string& query) const;
     void navigateToRows();
     std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types) const;
-    const unsigned short extractNumberOfRows() const;
+    unsigned short extractNumberOfRows(const std::string& columns_def, 
+        const std::unordered_map<std::string, std::vector<std::string>> tokens, const char* root, unsigned short page_size) const;
     void computeSchemaSize(const char* record_header,unsigned short size, unsigned short& type_size, unsigned short& name_size, 
         unsigned short& tbl_name_size, unsigned short& root_size,unsigned short& sql_size) const;
+    std::vector<uint64_t> computeSerialTypes(unsigned short page_offset, char* buf, int index) const;
+    void traverseBTreePage(uint32_t page_number);
+    TableB getPageType(uint32_t page_number) const;
+    
 public:
     Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
     const std::streampos getFileSize() const;

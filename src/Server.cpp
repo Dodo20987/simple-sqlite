@@ -63,6 +63,7 @@ int main(int argc, char* argv[]) {
             d1.printTables();
         }
         else if(input == ".exit") {
+            database_file.close();
             break;
         }
         else {
