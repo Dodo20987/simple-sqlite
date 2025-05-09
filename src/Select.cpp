@@ -56,12 +56,21 @@ void Database::selectColumnWithWhere(const std::string& query) {
         unsigned int header_size = this->parseVarint(record + offset, header_bytes);
         std::cout << "header_bytes: " << header_bytes << std::endl;
         offset += header_bytes;
-        std::cout << "pos: " << database_file.tellg() << std::endl;
+        //std::cout << "pos: " << database_file.tellg() << std::endl;
         std::cout << "header size: " << header_size << std::endl;
+        std::cout << "offset: " << offset << std::endl;
         unsigned int header2 = this->parseVarint(record + offset, header_bytes);
         offset += header_bytes;
+        std::cout << "header_bytes: " << header_bytes << std::endl;
+        std::cout << "header2: " << header2 << std::endl;
+        std::cout << "offset: " << offset << std::endl;
         unsigned int record_header_size = this->parseVarint(record + offset, header_bytes);
+        std::cout << "header_bytes: " << header_bytes << std::endl;
+        std::cout << "header3: " << record_header_size << std::endl;
         offset += header_bytes;
+        std::cout << "offset: " << offset << std::endl;
+
+
         database_file.seekg(-(9 - offset), std::ios::cur);
         char record_header[record_header_size];
         /*
@@ -96,7 +105,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
         std::cout << tbl_name_size << std::endl;
         std::cout << root_size << std::endl;
         std::cout << sql_size << std::endl;
-        //exit(1);
         char type_name[type_size];
         char table_name[name_size];
         char tbl[tbl_name_size];
@@ -113,10 +121,12 @@ void Database::selectColumnWithWhere(const std::string& query) {
         size_t start = sql.find('(') + 1;
         size_t end = sql.find(')');
         std::string columns_def = sql.substr(start, end - start);
-        std::string table_name_string(table_name);
-        std::cout << "type: " << type_name << std::endl;
+        std::string table_name_string(table_name, name_size);
         std::cout << "table: " << table_name_string << std::endl;
-        //exit(1);
+        std::cout << "table_name size: " << table_name_string.length() << std::endl;
+        std::cout << "calculated size: "  << name_size << std::endl;
+        std::cout << sql << std::endl;
+        exit(1);
         //exit(1);
         //std::cout << "h1" << std::endl;
         //std::cout << "table_name: " << name_size << " " << t << std::endl;

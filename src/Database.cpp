@@ -1,6 +1,6 @@
 #include "../include/Database.h"
 
-TableB Database::getPageType(uint32_t page_number) const {
+TableB Database::getPageTypeTableB(uint32_t page_number) const {
     int page_size = this->getPageSize();
     database_file.seekg(page_number * page_size);
 
@@ -16,8 +16,24 @@ TableB Database::getPageType(uint32_t page_number) const {
             return TableB::unknown;
     };
 }
-void Database::traverseBTreePage(uint32_t page_number) {
-    TableB page_type = this->getPageType(page_number);
+IndexB Database::getPageTypeIndexB(uint32_t page_number) const {
+    int page_size = this->getPageSize();
+    database_file.seekg(page_number * page_size);
+
+    unsigned char page_type_byte;
+    database_file.read(reinterpret_cast<char*>(page_type_byte), 1);
+
+    switch (page_type_byte) {
+        case 0x0d:
+            return IndexB::leafCell;
+        case 0x02:
+            return IndexB::interiorCell;
+        default:
+            return IndexB::unknown;
+    };
+}
+void Database::traverseBTreePageTableB(uint32_t page_number) {
+    TableB page_type = this->getPageTypeTableB(page_number);
     switch(page_type) {
         case TableB::leafCell:
             // do something
@@ -31,11 +47,24 @@ void Database::traverseBTreePage(uint32_t page_number) {
 
 }
 
+void Database::traverseBTreePageIndexB(uint32_t page_number) {
+    IndexB page_type = this->getPageTypeIndexB(page_number);
+    switch(page_type) {
+        case IndexB::leafCell:
+            // do something
+            break;
+        case IndexB::interiorCell:
+            // do something
+            break;
+        default:
+            return;
+    };
+}
+
 std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types) const {
     std::vector<std::string> column_values;
     for(size_t m = 0; m < serial_types.size(); ++m) {
         uint64_t stype = serial_types[m];
-        //std::vector<char> data;
         int size = 0;
         switch(stype) {
             case 0:

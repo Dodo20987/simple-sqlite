@@ -40,8 +40,10 @@ private:
     void computeSchemaSize(const char* record_header,unsigned short size, unsigned short& type_size, unsigned short& name_size, 
         unsigned short& tbl_name_size, unsigned short& root_size,unsigned short& sql_size) const;
     std::vector<uint64_t> computeSerialTypes(unsigned short page_offset, char* buf, int index) const;
-    void traverseBTreePage(uint32_t page_number);
-    TableB getPageType(uint32_t page_number) const;
+    void traverseBTreePageTableB(uint32_t page_number);
+    void traverseBTreePageIndexB(uint32_t page_number);
+    TableB getPageTypeTableB(uint32_t page_number) const;
+    IndexB getPageTypeIndexB(uint32_t page_number) const;
     
 public:
     Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
