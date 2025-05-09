@@ -41,15 +41,47 @@ void Database::selectColumnWithWhere(const std::string& query) {
         unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(header_buf), header_bytes_read);
         std::cout << "sz: " << header_size << std::endl;
         exit(1);*/
-        char record[3];
-        database_file.read(record, 3);
-        int header_bytes = 0;
-        unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(record), header_bytes);
-        //std::cout << "sz: " << header_size << std::endl;
-        unsigned short record_header_size = static_cast<unsigned short>(record[2]);
-        char record_header[record_header_size];
-        //std::cout << "record_header_size: " << record_header_size << std::endl;
 
+        unsigned char record[9];
+        std::cout << "pos: " << database_file.tellg() << std::endl;
+        database_file.read(reinterpret_cast<char*>(record),9);
+        /*
+        for (int i = 0; i < 9; ++i) {
+            printf("%02x ", record[i]);
+        }
+        std::cout << std::endl;*/
+        int header_bytes;
+        int offset = 0;
+        //unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(record[1]), header_bytes);
+        unsigned int header_size = this->parseVarint(record + offset, header_bytes);
+        std::cout << "header_bytes: " << header_bytes << std::endl;
+        offset += header_bytes;
+        std::cout << "pos: " << database_file.tellg() << std::endl;
+        std::cout << "header size: " << header_size << std::endl;
+        unsigned int header2 = this->parseVarint(record + offset, header_bytes);
+        offset += header_bytes;
+        unsigned int record_header_size = this->parseVarint(record + offset, header_bytes);
+        offset += header_bytes;
+        database_file.seekg(-(9 - offset), std::ios::cur);
+        char record_header[record_header_size];
+        /*
+        offset += header_bytes;
+        unsigned int header4 = this->parseVarint(record + offset, header_bytes);
+        std::cout << "offset: " << offset << std::endl;
+        std::cout << "header4: " << header2 << std::endl;
+        */
+
+
+
+
+
+        /*database_file.seekg(-(9 - header_bytes), std::ios::cur); //  TODO: adjust the values for this to see what works
+        std::cout << "pos: " << database_file.tellg() << std::endl;
+        unsigned short record_header_size = static_cast<unsigned short>(record[2]); //TODO: this indice is also hardcoded so try to find a way to not hardcode it
+        char record_header[record_header_size];
+        std::cout << "record len: " << record_header_size << std::endl;
+        int remaining_header_bytes = header_size - header_bytes;*/
+        //exit(1);
         // first entry contains the serial type for type, and entry 2
         // contains the serial type for name
         // TODO: Sizes are incorrect for types it seems like on the first iteration for superheroes.db we have record_header_size too high by 1
@@ -57,7 +89,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
         // off by 1 error currently
         database_file.read(record_header, record_header_size - 1); // -1 because the size of the header is alredy read previously
         unsigned short type_size, name_size, tbl_name_size, root_size, sql_size; 
-        this->computeSchemaSize(record_header, record_header_size - 1, type_size, name_size, tbl_name_size, root_size, sql_size);
+        this->computeSchemaSize(record_header, record_header_size - header_bytes, type_size, name_size, tbl_name_size, root_size, sql_size);
         //std::cout << cols << std::endl;
         std::cout << type_size << std::endl;
         std::cout << name_size << std::endl;
@@ -83,7 +115,9 @@ void Database::selectColumnWithWhere(const std::string& query) {
         std::string columns_def = sql.substr(start, end - start);
         std::string table_name_string(table_name);
         std::cout << "type: " << type_name << std::endl;
-        exit(1);
+        std::cout << "table: " << table_name_string << std::endl;
+        //exit(1);
+        //exit(1);
         //std::cout << "h1" << std::endl;
         //std::cout << "table_name: " << name_size << " " << t << std::endl;
         for (auto x: tokens["tables"]) {
