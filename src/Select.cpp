@@ -54,63 +54,27 @@ void Database::selectColumnWithWhere(const std::string& query) {
         int offset = 0;
         //unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(record[1]), header_bytes);
         unsigned int header_size = this->parseVarint(record + offset, header_bytes);
-        std::cout << "header_bytes: " << header_bytes << std::endl;
         offset += header_bytes;
         //std::cout << "pos: " << database_file.tellg() << std::endl;
-        std::cout << "header size: " << header_size << std::endl;
-        std::cout << "offset: " << offset << std::endl;
         unsigned int header2 = this->parseVarint(record + offset, header_bytes);
         offset += header_bytes;
-        std::cout << "header_bytes: " << header_bytes << std::endl;
-        std::cout << "header2: " << header2 << std::endl;
-        std::cout << "offset: " << offset << std::endl;
         unsigned int record_header_size = this->parseVarint(record + offset, header_bytes);
-        std::cout << "header_bytes: " << header_bytes << std::endl;
-        std::cout << "header3: " << record_header_size << std::endl;
         offset += header_bytes;
-        std::cout << "offset: " << offset << std::endl;
 
 
         database_file.seekg(-(9 - offset), std::ios::cur);
         char record_header[record_header_size];
-        /*
-        offset += header_bytes;
-        unsigned int header4 = this->parseVarint(record + offset, header_bytes);
-        std::cout << "offset: " << offset << std::endl;
-        std::cout << "header4: " << header2 << std::endl;
-        */
 
-
-
-
-
-        /*database_file.seekg(-(9 - header_bytes), std::ios::cur); //  TODO: adjust the values for this to see what works
-        std::cout << "pos: " << database_file.tellg() << std::endl;
-        unsigned short record_header_size = static_cast<unsigned short>(record[2]); //TODO: this indice is also hardcoded so try to find a way to not hardcode it
-        char record_header[record_header_size];
-        std::cout << "record len: " << record_header_size << std::endl;
-        int remaining_header_bytes = header_size - header_bytes;*/
-        //exit(1);
-        // first entry contains the serial type for type, and entry 2
-        // contains the serial type for name
-        // TODO: Sizes are incorrect for types it seems like on the first iteration for superheroes.db we have record_header_size too high by 1
-        // the next iteration is correct as it correctly identifies the strings and ints in the sqlite_schema table
-        // off by 1 error currently
         database_file.read(record_header, record_header_size - 1); // -1 because the size of the header is alredy read previously
         unsigned short type_size, name_size, tbl_name_size, root_size, sql_size; 
         this->computeSchemaSize(record_header, record_header_size - header_bytes, type_size, name_size, tbl_name_size, root_size, sql_size);
         //std::cout << cols << std::endl;
-        std::cout << type_size << std::endl;
-        std::cout << name_size << std::endl;
-        std::cout << tbl_name_size << std::endl;
-        std::cout << root_size << std::endl;
-        std::cout << sql_size << std::endl;
         char type_name[type_size];
         char table_name[name_size];
         char tbl[tbl_name_size];
         char root[root_size];
         char sql_text[sql_size];
-        std::cout << "root size: "  << root_size << std::endl;
+
         database_file.read(type_name, type_size);
         database_file.read(table_name, name_size);
         database_file.read(tbl, tbl_name_size);
@@ -122,11 +86,8 @@ void Database::selectColumnWithWhere(const std::string& query) {
         size_t end = sql.find(')');
         std::string columns_def = sql.substr(start, end - start);
         std::string table_name_string(table_name, name_size);
-        std::cout << "table: " << table_name_string << std::endl;
-        std::cout << "table_name size: " << table_name_string.length() << std::endl;
-        std::cout << "calculated size: "  << name_size << std::endl;
-        std::cout << sql << std::endl;
-        exit(1);
+        
+        //exit(1);
         //exit(1);
         //std::cout << "h1" << std::endl;
         //std::cout << "table_name: " << name_size << " " << t << std::endl;
@@ -137,6 +98,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::cout << "h2" << std::endl;
             std::istringstream col_stream(columns_def);
             std::string col;
+            std::cout << "h3" << std::endl;
             while(std::getline(col_stream, col, ',')) {
                std::istringstream col_word_stream(col);
                std::string col_name;
@@ -147,6 +109,9 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::vector<std::vector<std::string>::iterator> matched_iterators;
             std::vector<int> desired_col_indices;
             std::vector<int> col_indices;
+            for (auto x: column_names) {
+                std::cout << x << std::endl;
+            }
             for (const auto& x : tokens["cols"]) {
                 auto it = std::find(column_names.begin(), column_names.end(), x);   
                 if (it != column_names.end()) {
@@ -161,9 +126,11 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 col_indices.push_back(i);
                 index_to_name[i] = column_names[i];
             }
-
+            std::cout << "h4" << std::endl;
             size_t offset = 0;
-            int root_page = decodeVarint(root, offset);
+            //int root_page = decodeVarint(root, offset);
+            int root_page = static_cast<unsigned char>(root[0]);
+            std::cout << "root_page " << root_page << std::endl;
 
             //std::cout << "Root page: " << root_page << std::endl;
             //TableB page_type = this->getPageType(root_page);
@@ -172,12 +139,25 @@ void Database::selectColumnWithWhere(const std::string& query) {
 
             int page_offset = (root_page - 1) * page_size;
             char buf[2];
+            database_file.seekg(page_offset);
+            database_file.read(buf,1);
+            //TODO: must read the page type and check if it's an interior cell and traverse the B-Tree
+            uint32_t flag = static_cast<uint32_t>(buf[0]);
+            std::cout << "page_type: " << flag << std::endl;
+            //b_tree_nav.traverseBTreePageTableB(database_file,flag, page_offset,page_size);
+            exit(1);
             database_file.seekg(page_offset + 3);
             database_file.read(buf,2);
+            std::cout << "h5" << std::endl;
+            //TODO: THE number of rows is not getting computed correctly for the superheroes.db
             unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
+            std::cout << "h7" << std::endl;
+            std::cout << "num rows: " << number_of_rows << std::endl;
+            exit(1);
             for (int k = 0; k < number_of_rows; k++) {
+                std::cout << "h8" << std::endl;
                 std::vector<uint64_t> serial_types = this->computeSerialTypes(page_offset,buf,k);
-
+                std::cout << "h9" << std::endl;
                 std::vector<std::string> column_values = this->extractColumnValues(serial_types);
                 bool is_first_iteration = true;
                 std::unordered_map<std::string, std::string> row;

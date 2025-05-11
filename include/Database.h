@@ -10,6 +10,7 @@
 #include "../include/SQLParser.h"
 #include <unordered_map>
 #include "./serialHelper.h"
+#include "./BTreeNavigator.h"
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;
 enum class TableB {
@@ -27,6 +28,7 @@ enum class IndexB {
 class Database {
 private:
     mutable std::ifstream database_file;
+    mutable BTreeNavigator b_tree_nav;
     int64_t parseVarint(const unsigned char* data, int& bytes_read) const;
     const unsigned short getPageSize() const;
     bool matchesWhereCondition(const std::string& value, const std::string& operation, const std::string& condition) const;
@@ -40,13 +42,10 @@ private:
     void computeSchemaSize(const char* record_header,unsigned short size, unsigned short& type_size, unsigned short& name_size, 
         unsigned short& tbl_name_size, unsigned short& root_size,unsigned short& sql_size) const;
     std::vector<uint64_t> computeSerialTypes(unsigned short page_offset, char* buf, int index) const;
-    void traverseBTreePageTableB(uint32_t page_number);
-    void traverseBTreePageIndexB(uint32_t page_number);
-    TableB getPageTypeTableB(uint32_t page_number) const;
-    IndexB getPageTypeIndexB(uint32_t page_number) const;
+    
     
 public:
-    Database(std::ifstream&& database_file) : database_file(std::move(database_file)) {}
+    Database(std::ifstream&& database_file, BTreeNavigator nav) : database_file(std::move(database_file)), b_tree_nav(nav) {}
     const std::streampos getFileSize() const;
     void printTables();
     void printDBInfo();
@@ -55,5 +54,6 @@ public:
     void selectColumnWithWhere(const std::string &query);
     bool isCount(const std::string& query) const;
     bool hasWhereClause(const std::string& query) const;
+    
 
 };

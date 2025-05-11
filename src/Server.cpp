@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include "../include/Database.h"
 #include "../include/SQLParser.h"
-
+#include "../include/BTreeNavigator.h"
 void string_parse_test(const std::string& query) {
     SQLParser sql(query);
     auto res = sql.selectQuery();
@@ -53,8 +53,8 @@ int main(int argc, char* argv[]) {
             std::cerr << "Failed to open the database file" << std::endl;
             return 0;
         }
-
-        Database d1(std::move(database_file));
+        BTreeNavigator nav;
+        Database d1(std::move(database_file),nav);
         //SQLParser s1(command);
         if (input == ".dbinfo") {
             d1.printDBInfo();

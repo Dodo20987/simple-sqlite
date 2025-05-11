@@ -1,66 +1,5 @@
 #include "../include/Database.h"
 
-TableB Database::getPageTypeTableB(uint32_t page_number) const {
-    int page_size = this->getPageSize();
-    database_file.seekg(page_number * page_size);
-
-    unsigned char page_type_byte;
-    database_file.read(reinterpret_cast<char*>(page_type_byte), 1);
-
-    switch (page_type_byte) {
-        case 0x0d:
-            return TableB::leafCell;
-        case 0x02:
-            return TableB::interiorCell;
-        default:
-            return TableB::unknown;
-    };
-}
-IndexB Database::getPageTypeIndexB(uint32_t page_number) const {
-    int page_size = this->getPageSize();
-    database_file.seekg(page_number * page_size);
-
-    unsigned char page_type_byte;
-    database_file.read(reinterpret_cast<char*>(page_type_byte), 1);
-
-    switch (page_type_byte) {
-        case 0x0d:
-            return IndexB::leafCell;
-        case 0x02:
-            return IndexB::interiorCell;
-        default:
-            return IndexB::unknown;
-    };
-}
-void Database::traverseBTreePageTableB(uint32_t page_number) {
-    TableB page_type = this->getPageTypeTableB(page_number);
-    switch(page_type) {
-        case TableB::leafCell:
-            // do something
-            break;
-        case TableB::interiorCell:
-            // do something
-            break;
-        default:
-            return;
-    };
-
-}
-
-void Database::traverseBTreePageIndexB(uint32_t page_number) {
-    IndexB page_type = this->getPageTypeIndexB(page_number);
-    switch(page_type) {
-        case IndexB::leafCell:
-            // do something
-            break;
-        case IndexB::interiorCell:
-            // do something
-            break;
-        default:
-            return;
-    };
-}
-
 std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types) const {
     std::vector<std::string> column_values;
     for(size_t m = 0; m < serial_types.size(); ++m) {
@@ -136,13 +75,18 @@ unsigned short Database::extractNumberOfRows(const std::string& columns_def, con
 
 }
 std::vector<uint64_t> Database::computeSerialTypes(unsigned short page_offset, char* buf, int index) const {
+    std::cout << "i1" << std::endl;
     database_file.seekg(page_offset + PAGE_SIZE + (index * 2));
+std::cout << "i2" << std::endl;
     database_file.read(buf,2);
+std::cout << "i3" << std::endl;
     unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
+std::cout << "i4" << std::endl;
     database_file.seekg(page_offset + cell_offset);
     unsigned char varint_buf[9];
     database_file.read(reinterpret_cast<char*>(varint_buf), 9); 
 
+std::cout << "i5" << std::endl;
     int offset = 0;
     int bytes;
     uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
@@ -155,7 +99,12 @@ std::vector<uint64_t> Database::computeSerialTypes(unsigned short page_offset, c
     offset = 0;
     uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
+std::cout << "i6" << std::endl;
+    std::cout << "header_Size: " << header_size << std::endl;
+    std::cout << "offset: " << offset << std::endl;
+    std::cout << "computed: " << header_size - offset << std::endl;
     std::vector<unsigned char> header(header_size - offset);
+std::cout << "i7" << std::endl;
     database_file.seekg(-(9 - offset), std::ios::cur);
     // -1 because we're off by 1 when reading
     database_file.read(reinterpret_cast<char*>(header.data()), header_size - 1);
@@ -196,13 +145,7 @@ void Database::computeSchemaSize(const char* record_header,
         serial_types.push_back(serial_type);
         offset += bytes_read;
         int display = (serial_type >= 13) ? ((static_cast<unsigned short>(serial_type) - 13) / 2) : -1;
-        std::cout << "raw serial_type: " << serial_type 
-              << ", bytes_read: " << bytes_read 
-              << ", size guess: " << ((serial_type >= 13) ? ((serial_type - 13) / 2) : -1) 
-              << std::endl;
-        std::cout << "t: " << bytes_read << " " << display << std::endl;
     }
-    std::cout << "vec size: " << serial_types.size() << std::endl;
     type_size = (static_cast<unsigned short>(serial_types[0]) - 13) / 2;
     name_size = (static_cast<unsigned short>(serial_types[1]) - 13) / 2;
     tbl_name_size = (static_cast<unsigned short>(serial_types[2]) - 13) / 2;
