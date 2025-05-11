@@ -13,16 +13,7 @@
 #include "./BTreeNavigator.h"
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;
-enum class TableB {
-    leafCell = 0x0d,
-    interiorCell = 0x05,
-    unknown = 0
-};
-enum class IndexB {
-    leafCell = 0x0a,
-    interiorCell = 0x02,
-    unknown = 0
-};
+
 
 
 class Database {

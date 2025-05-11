@@ -7,8 +7,17 @@
 #include <algorithm>
 #include <iomanip>
 #include "../include/SQLParser.h"
-#include "../include/Database.h"
 
+enum class TableB {
+    leafCell = 0x0d,
+    interiorCell = 0x05,
+    unknown = 0
+};
+enum class IndexB {
+    leafCell = 0x0a,
+    interiorCell = 0x02,
+    unknown = 0
+};
 class BTreeNavigator {
 private:
     TableB getPageTypeTableB(std::ifstream& database_file, uint32_t page_number, int page_size) const;
