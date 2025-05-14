@@ -74,40 +74,41 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
 unsigned short Database::extractNumberOfRows(const std::string& columns_def, const std::unordered_map<std::string, std::vector<std::string>> tokens, const char* root, unsigned short page_size) const {
 
 }
-std::vector<uint64_t> Database::computeSerialTypes(unsigned short page_offset, char* buf, int index) const {
-    std::cout << "i1" << std::endl;
-    database_file.seekg(page_offset + PAGE_SIZE + (index * 2));
-std::cout << "i2" << std::endl;
+std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index) const {
+    database_file.seekg(page_offset + 8 + (index * 2));
     database_file.read(buf,2);
-std::cout << "i3" << std::endl;
     unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
-std::cout << "i4" << std::endl;
     database_file.seekg(page_offset + cell_offset);
     unsigned char varint_buf[9];
     database_file.read(reinterpret_cast<char*>(varint_buf), 9); 
 
-std::cout << "i5" << std::endl;
     int offset = 0;
     int bytes;
     uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
     uint64_t rowid = this->parseVarint(varint_buf + offset, bytes);
+    //std::cout << rowid << "|";
     offset += bytes;
      
     database_file.seekg(page_offset + offset + cell_offset);
+    /*
+    std::cout << "page offset: " << page_offset << " ";
+    std::cout << "offset: " << offset << " ";
+    std::cout << "cell_offset: " << cell_offset << " ";
+    std::cout << "sum " << page_offset + offset + cell_offset << std::endl;*/
     database_file.read(reinterpret_cast<char*>(varint_buf), 9);
     offset = 0;
     uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
-std::cout << "i6" << std::endl;
+    /*
     std::cout << "header_Size: " << header_size << std::endl;
     std::cout << "offset: " << offset << std::endl;
-    std::cout << "computed: " << header_size - offset << std::endl;
+    std::cout << "computed: " << header_size - offset << std::endl;*/
+    //std::cout << "v1" << std::endl;
     std::vector<unsigned char> header(header_size - offset);
-std::cout << "i7" << std::endl;
+    //std::cout << "v2" << std::endl;
     database_file.seekg(-(9 - offset), std::ios::cur);
-    // -1 because we're off by 1 when reading
-    database_file.read(reinterpret_cast<char*>(header.data()), header_size - 1);
+    database_file.read(reinterpret_cast<char*>(header.data()), header_size - offset);
 
     std::vector<uint64_t> serial_types;
     int h_offset = 0;

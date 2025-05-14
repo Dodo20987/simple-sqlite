@@ -23,7 +23,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
     char buf[2];
     database_file.seekg(HEADER_SIZE);
     database_file.read(buf,1);
-    std::cout << "page type: " << static_cast<int>(buf[0]) << std::endl;
+    //std::cout << "page type: " << static_cast<int>(buf[0]) << std::endl;
     database_file.seekg(HEADER_SIZE + 3);
     database_file.read(buf,2);
     unsigned short cell_count = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
@@ -43,7 +43,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
         exit(1);*/
 
         unsigned char record[9];
-        std::cout << "pos: " << database_file.tellg() << std::endl;
+        //std::cout << "pos: " << database_file.tellg() << std::endl;
         database_file.read(reinterpret_cast<char*>(record),9);
         /*
         for (int i = 0; i < 9; ++i) {
@@ -91,14 +91,12 @@ void Database::selectColumnWithWhere(const std::string& query) {
         //exit(1);
         //std::cout << "h1" << std::endl;
         //std::cout << "table_name: " << name_size << " " << t << std::endl;
-        for (auto x: tokens["tables"]) {
+        /*for (auto x: tokens["tables"]) {
             std::cout << "parsed table name: " << x << std::endl;
-        }
+        }*/
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
-            std::cout << "h2" << std::endl;
             std::istringstream col_stream(columns_def);
             std::string col;
-            std::cout << "h3" << std::endl;
             while(std::getline(col_stream, col, ',')) {
                std::istringstream col_word_stream(col);
                std::string col_name;
@@ -109,9 +107,10 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::vector<std::vector<std::string>::iterator> matched_iterators;
             std::vector<int> desired_col_indices;
             std::vector<int> col_indices;
+            /*
             for (auto x: column_names) {
                 std::cout << x << std::endl;
-            }
+            }*/
             for (const auto& x : tokens["cols"]) {
                 auto it = std::find(column_names.begin(), column_names.end(), x);   
                 if (it != column_names.end()) {
@@ -126,11 +125,10 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 col_indices.push_back(i);
                 index_to_name[i] = column_names[i];
             }
-            std::cout << "h4" << std::endl;
             size_t offset = 0;
             //int root_page = decodeVarint(root, offset);
             int root_page = static_cast<unsigned char>(root[0]);
-            std::cout << "root_page " << root_page << std::endl;
+            //std::cout << "root_page " << root_page << std::endl;
 
             //std::cout << "Root page: " << root_page << std::endl;
             //TableB page_type = this->getPageType(root_page);
@@ -143,9 +141,10 @@ void Database::selectColumnWithWhere(const std::string& query) {
             database_file.read(buf,1);
             //TODO: must read the page type and check if it's an interior cell and traverse the B-Tree
             uint32_t flag = static_cast<uint32_t>(buf[0]);
-            std::cout << "page_type: " << flag << std::endl;
-            //b_tree_nav.traverseBTreePageTableB(database_file,flag, page_offset,page_size);
-            exit(1);
+            //std::cout << "page_type: " << flag << std::endl;
+            b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
+            col_indices, index_to_name, *this);
+            /*
             database_file.seekg(page_offset + 3);
             database_file.read(buf,2);
             std::cout << "h5" << std::endl;
@@ -179,7 +178,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
                     std::cout << std::endl;
                 }
 
-            }
+            }*/
             break;
         }
     }

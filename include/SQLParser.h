@@ -6,6 +6,7 @@
 #include <vector>
 #include <sstream>
 #include <unordered_map>
+#include <cctype>
 enum {
     COUNT = 0,
     SELECT = 1,

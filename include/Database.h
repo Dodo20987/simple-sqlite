@@ -14,7 +14,7 @@
 const int HEADER_SIZE = 100;
 const int PAGE_SIZE = 8;
 
-
+class BTreeNavigator;
 
 class Database {
 private:
@@ -23,16 +23,13 @@ private:
     int64_t parseVarint(const unsigned char* data, int& bytes_read) const;
     const unsigned short getPageSize() const;
     bool matchesWhereCondition(const std::string& value, const std::string& operation, const std::string& condition) const;
-    bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row) const;
     bool evaluateCondition(const WhereCondition& cond, const std::unordered_map<std::string, std::string>& row) const;
     void parseSQL(const std::string& query) const;
     void navigateToRows();
-    std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types) const;
     unsigned short extractNumberOfRows(const std::string& columns_def, 
         const std::unordered_map<std::string, std::vector<std::string>> tokens, const char* root, unsigned short page_size) const;
     void computeSchemaSize(const char* record_header,unsigned short size, unsigned short& type_size, unsigned short& name_size, 
         unsigned short& tbl_name_size, unsigned short& root_size,unsigned short& sql_size) const;
-    std::vector<uint64_t> computeSerialTypes(unsigned short page_offset, char* buf, int index) const;
     
     
 public:
@@ -45,6 +42,9 @@ public:
     void selectColumnWithWhere(const std::string &query);
     bool isCount(const std::string& query) const;
     bool hasWhereClause(const std::string& query) const;
+    std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types) const;
+    bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row) const;
+    std::vector<uint64_t> computeSerialTypes(uint32_t page_offset, char* buf, int index) const;
     
 
 };

@@ -48,11 +48,19 @@ int main(int argc, char* argv[]) {
     while(true) {
         accept_input();
         std::getline(std::cin, input);
-        std::ifstream database_file(database_file_path, std::ios::binary);
-        if (!database_file) {
-            std::cerr << "Failed to open the database file" << std::endl;
-            return 0;
-        }
+        std::ifstream database_file(database_file_path, std::ios::binary | std::ios::ate);
+        std::streamsize size = database_file.tellg();
+        database_file.seekg(16);
+        char page_size_bytes[2];
+        database_file.read(page_size_bytes, 2);
+        uint16_t page_size = (static_cast<unsigned char>(page_size_bytes[0]) << 8) |
+                              static_cast<unsigned char>(page_size_bytes[1]);
+        //std::cout << "file size: " << size << std::endl;
+        if (page_size == 1) page_size = 65536;  // special case in SQLite spec
+
+        // Step 3: calculate max page number
+        uint32_t max_page_number = size / page_size;
+
         BTreeNavigator nav;
         Database d1(std::move(database_file),nav);
         //SQLParser s1(command);

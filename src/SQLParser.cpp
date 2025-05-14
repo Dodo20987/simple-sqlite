@@ -50,9 +50,11 @@ WhereClause SQLParser::parseWhereClause() const {
     std::string current;
 
     while(iss >> token) {
-        if (token == "AND" || token == "OR") {
+        std::string upper_token = token;
+        std::transform(upper_token.begin(), upper_token.end(), upper_token.begin(), ::toupper);
+        if (upper_token == "AND" || upper_token == "OR") {
             clause.conditions.push_back(parseCondition(current));
-            clause.logic.push_back(token == "AND" ? LogicalOp::AND : LogicalOp::OR);
+            clause.logic.push_back(upper_token == "AND" ? LogicalOp::AND : LogicalOp::OR);
             current.clear();
         }
         else {
