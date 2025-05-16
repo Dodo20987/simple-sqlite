@@ -21,9 +21,10 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
     for (int k = 0; k < number_of_rows; k++) {
         //std::cout << "1" << std::endl;
         //std::cout << "page offset: " << page_offset << std::endl;
-        std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset,buf,k);
+        uint64_t rowid = 0;
+        std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset,buf,k, rowid);
         //std::cout << "2" << std::endl;
-        std::vector<std::string> column_values = db.extractColumnValues(serial_types);
+        std::vector<std::string> column_values = db.extractColumnValues(serial_types, rowid);
         //std::cout << "3" << std::endl;
         bool is_first_iteration = true;
         std::unordered_map<std::string, std::string> row;
@@ -31,8 +32,13 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
         for (int col_index : col_indices) {
             if (col_index < column_values.size()) {
                 row[index_to_name[col_index]] = column_values[col_index];
+                //std::cout << "index: " << index_to_name[col_index] << " val: " << row[index_to_name[col_index]] << std::endl;
             }
         }
+        /*
+        for (const auto& x : row) {
+            std::cout << "key: " << x.first << " val: " << x.second << std::endl;
+        }*/
         if(db.evaluateWhere(where, row)) {
             for(const auto& val : row) {
                 if(is_first_iteration) {

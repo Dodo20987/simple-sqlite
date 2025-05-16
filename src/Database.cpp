@@ -1,7 +1,8 @@
 #include "../include/Database.h"
 
-std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types) const {
+std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types, uint64_t& rowid) const {
     std::vector<std::string> column_values;
+    //column_values.push_back(std::to_string(rowid));
     for(size_t m = 0; m < serial_types.size(); ++m) {
         uint64_t stype = serial_types[m];
         int size = 0;
@@ -50,7 +51,10 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
             for (int k = 0; k < size; ++k) {
                 ss << std::hex << std::setfill('0') << std::setw(2) << (0xff & static_cast<unsigned char>(data[k]));
             }
-            if (stype >= 1 && stype <= 6) {
+            if (stype == 0) {
+                column_values.push_back(std::to_string(rowid));
+            }
+            else if (stype >= 1 && stype <= 6) {
                 column_values.emplace_back(handleInt(data,size));
             }
             else if (stype == 7) {
@@ -71,10 +75,7 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
     return column_values;
 }
 
-unsigned short Database::extractNumberOfRows(const std::string& columns_def, const std::unordered_map<std::string, std::vector<std::string>> tokens, const char* root, unsigned short page_size) const {
-
-}
-std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index) const {
+std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const {
     database_file.seekg(page_offset + 8 + (index * 2));
     database_file.read(buf,2);
     unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
@@ -86,7 +87,7 @@ std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* b
     int bytes;
     uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
-    uint64_t rowid = this->parseVarint(varint_buf + offset, bytes);
+    rowid = this->parseVarint(varint_buf + offset, bytes);
     //std::cout << rowid << "|";
     offset += bytes;
      
@@ -200,6 +201,7 @@ bool Database::evaluateCondition(const WhereCondition& cond, const std::unordere
     if (it == row.end()) return false; // col does not exist
 
     const std::string& val = it->second;
+    //std::cout << "cond col: " << cond.column << std::endl;
     //std::cout << "val: " << val << std::endl;
     if (cond.operation == "=") return val == cond.value;
     if (cond.operation == "!=") return val != cond.value;
@@ -218,7 +220,7 @@ bool Database::evaluateWhere(const WhereClause& where, const std::unordered_map<
     bool result = evaluateCondition(where.conditions[0], row);
     //std::cout << "logic size" << where.logic.size() << std::endl;
     //std::cout << "cond: " << "{" << where.conditions[0].column << where.conditions[0].operation << where.conditions[0].value << "}" << std::endl;
-    //std::cout << "res" << result << std::endl;
+    //std::cout << "res: " << result << std::endl;
     for (size_t i = 0; i < where.logic.size(); i++) {
         //std::cout << "cond: " << "{" << where.conditions[i].column << where.conditions[i].operation << where.conditions[i].value << "}" << std::endl;
         bool next = evaluateCondition(where.conditions[i + 1], row);

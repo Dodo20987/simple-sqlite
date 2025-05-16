@@ -42,9 +42,9 @@ public:
     void selectColumnWithWhere(const std::string &query);
     bool isCount(const std::string& query) const;
     bool hasWhereClause(const std::string& query) const;
-    std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types) const;
+    std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types, uint64_t& rowid) const;
     bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row) const;
-    std::vector<uint64_t> computeSerialTypes(uint32_t page_offset, char* buf, int index) const;
+    std::vector<uint64_t> computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const;
     
 
 };

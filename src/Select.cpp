@@ -23,7 +23,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
     char buf[2];
     database_file.seekg(HEADER_SIZE);
     database_file.read(buf,1);
-    //std::cout << "page type: " << static_cast<int>(buf[0]) << std::endl;
     database_file.seekg(HEADER_SIZE + 3);
     database_file.read(buf,2);
     unsigned short cell_count = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
@@ -125,6 +124,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 col_indices.push_back(i);
                 index_to_name[i] = column_names[i];
             }
+
             size_t offset = 0;
             //int root_page = decodeVarint(root, offset);
             int root_page = static_cast<unsigned char>(root[0]);
@@ -144,41 +144,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
             //std::cout << "page_type: " << flag << std::endl;
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
             col_indices, index_to_name, *this);
-            /*
-            database_file.seekg(page_offset + 3);
-            database_file.read(buf,2);
-            std::cout << "h5" << std::endl;
-            //TODO: THE number of rows is not getting computed correctly for the superheroes.db
-            unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
-            std::cout << "h7" << std::endl;
-            std::cout << "num rows: " << number_of_rows << std::endl;
-            exit(1);
-            for (int k = 0; k < number_of_rows; k++) {
-                std::cout << "h8" << std::endl;
-                std::vector<uint64_t> serial_types = this->computeSerialTypes(page_offset,buf,k);
-                std::cout << "h9" << std::endl;
-                std::vector<std::string> column_values = this->extractColumnValues(serial_types);
-                bool is_first_iteration = true;
-                std::unordered_map<std::string, std::string> row;
-                WhereClause where = string_parser.parseWhereClause();
-                for (int col_index : col_indices) {
-                    if (col_index < column_values.size()) {
-                        row[index_to_name[col_index]] = column_values[col_index];
-                    }
-                }
-
-                if(evaluateWhere(where, row)) {
-                    for(const auto& val : row) {
-                        if(is_first_iteration) {
-                            std::cout << val.second;
-                            is_first_iteration = false;
-                        }
-                        else std::cout << "|" << val.second;
-                    }
-                    std::cout << std::endl;
-                }
-
-            }*/
             break;
         }
     }
@@ -256,9 +221,10 @@ void Database::selectColumn(const std::string& query) {
             database_file.read(buf,2);
             unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
             for (int k = 0; k < number_of_rows; k++) {
-                std::vector<uint64_t> serial_types = this->computeSerialTypes(page_offset,buf,k);
+                uint64_t rowid = 0;
+                std::vector<uint64_t> serial_types = this->computeSerialTypes(page_offset,buf,k, rowid);
 
-                std::vector<std::string> column_values = this->extractColumnValues(serial_types);
+                std::vector<std::string> column_values = this->extractColumnValues(serial_types, rowid);
                 bool is_first_iteration = true;
                 for (int col_index : col_indices) {
                     if (col_index < column_values.size()) {
