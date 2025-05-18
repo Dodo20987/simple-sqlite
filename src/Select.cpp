@@ -23,6 +23,8 @@ void Database::selectColumnWithWhere(const std::string& query) {
     char buf[2];
     database_file.seekg(HEADER_SIZE);
     database_file.read(buf,1);
+    uint32_t flag = static_cast<unsigned char>(buf[0]);
+    //std::cout << "flag: " << flag << std::endl;
     database_file.seekg(HEADER_SIZE + 3);
     database_file.read(buf,2);
     unsigned short cell_count = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
@@ -44,11 +46,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
         unsigned char record[9];
         //std::cout << "pos: " << database_file.tellg() << std::endl;
         database_file.read(reinterpret_cast<char*>(record),9);
-        /*
-        for (int i = 0; i < 9; ++i) {
-            printf("%02x ", record[i]);
-        }
-        std::cout << std::endl;*/
         int header_bytes;
         int offset = 0;
         //unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(record[1]), header_bytes);
@@ -85,15 +82,21 @@ void Database::selectColumnWithWhere(const std::string& query) {
         size_t end = sql.find(')');
         std::string columns_def = sql.substr(start, end - start);
         std::string table_name_string(table_name, name_size);
-        
-        //exit(1);
-        //exit(1);
-        //std::cout << "h1" << std::endl;
-        //std::cout << "table_name: " << name_size << " " << t << std::endl;
-        /*for (auto x: tokens["tables"]) {
-            std::cout << "parsed table name: " << x << std::endl;
-        }*/
+        SQLParser check_index(sql);
+        int root_page = static_cast<unsigned char>(root[0]);
+        for(auto x: tokens["tables"]) {
+            std::cout << "table name: " << x << std::endl;
+        }
+
+        if(check_index.isCreateIndex()) {
+            std::cout << "is a create index: " << std::endl;
+            std::cout << sql << std::endl;
+        }
+        else {
+            std::cout << "not create index table" << std::endl;
+        }
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
+            exit(1);
             std::istringstream col_stream(columns_def);
             std::string col;
             while(std::getline(col_stream, col, ',')) {
@@ -106,10 +109,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::vector<std::vector<std::string>::iterator> matched_iterators;
             std::vector<int> desired_col_indices;
             std::vector<int> col_indices;
-            /*
-            for (auto x: column_names) {
-                std::cout << x << std::endl;
-            }*/
+
             for (const auto& x : tokens["cols"]) {
                 auto it = std::find(column_names.begin(), column_names.end(), x);   
                 if (it != column_names.end()) {
@@ -128,12 +128,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
             size_t offset = 0;
             //int root_page = decodeVarint(root, offset);
             int root_page = static_cast<unsigned char>(root[0]);
-            //std::cout << "root_page " << root_page << std::endl;
-
-            //std::cout << "Root page: " << root_page << std::endl;
-            //TableB page_type = this->getPageType(root_page);
-            //std::cout << "tableB page type: " << page_type << std::endl;
-            //std::cout << "tableB page type: " << static_cast<int>(page_type) << std::endl;
 
             int page_offset = (root_page - 1) * page_size;
             char buf[2];

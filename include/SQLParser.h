@@ -35,6 +35,10 @@ public:
     SQLParser() : query("") {}
     SQLParser(const std::string& query) : query(query) {}
     bool isWhereClause() const;
+    bool isCreateIndex() const;
+    bool isCreateTable() const;
+    bool matchIndexToTable(const std::string& table_name) const;
+    std::vector<std::string> extractColumnIndice() const; 
     WhereClause parseWhereClause() const;
     const std::string getQuery() const;
     void setQuery(const std::string& query);

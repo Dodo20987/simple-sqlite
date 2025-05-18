@@ -1,8 +1,36 @@
 #include "../include/SQLParser.h"
 
+bool SQLParser::isCreateIndex() const {
+    std::string upper_query = query;
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    bool res = upper_query.find("CREATE INDEX") != std::string::npos;
+    return res;
+}
+
+bool SQLParser::isCreateTable() const {
+    std::string upper_query = query;
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    bool res = upper_query.find("CREATE TABLE") != std::string::npos;
+    return res;
+}
+bool SQLParser::matchIndexToTable(const std::string& table_name) const {
+    bool res = false;
+    std::string upper_query = query;
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    std::string keyword = "ON ";
+    size_t pos = upper_query.find(keyword);
+    if(pos != std::string::npos) {
+        pos += keyword.length();
+        size_t end = upper_query.find(' ', pos);
+        std::string actual_name = query.substr(pos, end - pos);
+        res = actual_name == table_name;
+    }
+    return res;
+}
 const std::string SQLParser::getQuery() const {
     return query;
 }
+
 
 void SQLParser::setQuery(const std::string& query) {
     this->query = query;
@@ -69,7 +97,10 @@ WhereClause SQLParser::parseWhereClause() const {
 }
 std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery() const {
     //std::regex regex(R"(select (.*?) from (\w+))", std::regex::icase);
-    std::regex regex(R"(select\s+(.*?)\s+from\s+(\w+))", std::regex::icase);
+    //std::regex regex(R"(select\s+(.*?)\s+from\s+(\w+))", std::regex::icase);
+    //std::regex regex(R"(select\s+(.*?)\s+from\s+([^;]+))", std::regex::icase);
+    //std::regex regex(R"(select\s+(.*?)\s+from\s+([^\s]+(?:\s*,\s*[^\s]+)*))", std::regex::icase);
+    std::regex regex(R"(select\s+(.*?)\s+from\s+(.+?)(?:\s+where|\s*$))", std::regex::icase);
     std::smatch match;
     std::unordered_map<std::string, std::vector<std::string>> mp;
     mp["cols"] = {};
@@ -91,10 +122,11 @@ std::unordered_map<std::string, std::vector<std::string>> SQLParser::selectQuery
         // splitting tables by comma, and stripping white space
         std::vector<std::string> tables;
         std::istringstream ss2(table_name);
-        while(std::getline(ss2,col, ',')) {
-            col.erase(0, col.find_first_not_of(" \t"));
-            col.erase(col.find_last_not_of(" \t") + 1);
-            tables.push_back(col);
+        std::string tbl;
+        while(std::getline(ss2,tbl, ',')) {
+            tbl.erase(0, tbl.find_first_not_of(" \t"));
+            tbl.erase(tbl.find_last_not_of(" \t") + 1);
+            tables.push_back(tbl);
         }
         mp["cols"] = columns;
         mp["tables"] = tables;

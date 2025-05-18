@@ -1,10 +1,38 @@
 #include "../include/BTreeNavigator.h"
 #include "../include/Database.h"
 
-void BTreeNavigator::readInteriorTablePage(int page_offset) {
+TableB BTreeNavigator::getPageTypeTableB(std::ifstream& database_file, uint32_t page_number, int page_size) const {
+    database_file.seekg((page_number - 1) * page_size + (page_number == 1 ? 100 : 0));
+    char page_type_byte[2];
+    database_file.read(page_type_byte, 1);
+    uint32_t flag = static_cast<uint32_t>(page_type_byte[0]);
+    std::cout << "flag: " << flag << std::endl;
+
+    switch (flag) {
+        case 0x0d:
+            return TableB::leafCell;
+        case 0x05:
+            return TableB::interiorCell;
+        default:
+            return TableB::unknown;
+    }
+}
+IndexB BTreeNavigator::getPageTypeIndexB(std::ifstream& database_file, uint32_t page_number, int page_size) const {
+    char data[2];
+    database_file.seekg((page_number - 1) * page_size);
+    database_file.read(data, 1);
+    uint32_t flag = static_cast<unsigned char>(data[0]);
+    std::cout << "index flag: " << flag << std::endl;
+    switch(flag) {
+        case 0x0a:
+            return IndexB::leafCell;
+        case 0x02:
+            return IndexB::interiorCell;
+        default:
+            return IndexB::unknown;
+    }
 
 }
-
 void BTreeNavigator::readLeafTablePage(std::ifstream& database_file, uint32_t page_offset, SQLParser& string_parser, std::vector<int>& col_indices,
 std::unordered_map<int, std::string>& index_to_name, Database& db) {
     // number of cells
@@ -14,10 +42,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
     database_file.read(buf,2);
     //TODO: THE number of rows is not getting computed correctly for the superheroes.db
     unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
-    /*
-    std::cout << "num rows: " << number_of_rows << std::endl;
-    */
-    //exit(1);
     for (int k = 0; k < number_of_rows; k++) {
         //std::cout << "1" << std::endl;
         //std::cout << "page offset: " << page_offset << std::endl;
@@ -35,10 +59,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
                 //std::cout << "index: " << index_to_name[col_index] << " val: " << row[index_to_name[col_index]] << std::endl;
             }
         }
-        /*
-        for (const auto& x : row) {
-            std::cout << "key: " << x.first << " val: " << x.second << std::endl;
-        }*/
         if(db.evaluateWhere(where, row)) {
             for(const auto& val : row) {
                 if(is_first_iteration) {
@@ -49,31 +69,15 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
             }
             std::cout << std::endl;
         }
-        //std::cout << "here" << std::endl;
-
     }
-    //std::cout << "d1" << std::endl;
 }
 
-TableB BTreeNavigator::getPageTypeTableB(std::ifstream& database_file, uint32_t page_number, int page_size) const {
-    database_file.seekg((page_number - 1) * page_size + (page_number == 1 ? 100 : 0));
-    //std::cout << "in off: " << (page_number - 1) * page_size << std::endl;
-    char page_type_byte[2];
-    database_file.read(page_type_byte, 1);
-    uint32_t flag = static_cast<uint32_t>(page_type_byte[0]);
 
-    switch (flag) {
-        case 0x0d:
-            return TableB::leafCell;
-        case 0x05:
-            return TableB::interiorCell;
-        default:
-            return TableB::unknown;
-    };
-}
 void BTreeNavigator::traverseBTreePageTableB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser,
 std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db) {
     TableB page_type = this->getPageTypeTableB(database_file, page_number, page_size);
+    IndexB index_type = this->getPageTypeIndexB(database_file, page_number, page_size);
+   //exit(1);
     switch(page_type) {
         case TableB::leafCell: {
             // extracting the records
@@ -128,7 +132,8 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
     };
 
 }
-/*
+
+
 void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size) {
     IndexB page_type = this->getPageTypeIndexB(database_file, page_number, page_size);
     switch(page_type) {
@@ -141,5 +146,5 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
         default:
             return;
     };
-}*/
+}
 
