@@ -1,5 +1,31 @@
 #include "../include/SQLParser.h"
 
+std::vector<std::string> SQLParser::extractColumnIndice() const {
+    std::string upper_query = query;
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    std::string keyword = "ON ";
+    size_t pos = upper_query.find(keyword);
+    std::vector<std::string> res;
+    // TODO: using ',' as as the delim, iterate through the string and push into the res array
+    if (pos != std::string::npos) {
+        pos += keyword.length();
+        size_t begin = upper_query.find('(', pos) + 1;
+        size_t open_paren = upper_query.find("(", pos);
+        size_t close_paren = upper_query.find(")", open_paren);
+        char delim = ',';
+        if(open_paren != std::string::npos && close_paren != std::string::npos) {
+            std::string cols = query.substr(open_paren + 1, close_paren - open_paren - 1);
+            std::stringstream ss(cols);
+            std::string col;
+            while(std::getline(ss, col, delim)) {
+                col.erase(std::remove_if(col.begin(), col.end(), ::isspace), col.end());
+                res.push_back(col);
+            }
+        }
+       
+    }
+    return res;
+}
 bool SQLParser::isCreateIndex() const {
     std::string upper_query = query;
     std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);

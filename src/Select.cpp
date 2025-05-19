@@ -35,13 +35,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
         unsigned short curr_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
         database_file.seekg(curr_offset);
         
-        /*char header_buf[9];
-        database_file.read(header_buf, 9);
-
-        int header_bytes_read = 0;
-        unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(header_buf), header_bytes_read);
-        std::cout << "sz: " << header_size << std::endl;
-        exit(1);*/
 
         unsigned char record[9];
         //std::cout << "pos: " << database_file.tellg() << std::endl;
@@ -88,9 +81,17 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::cout << "table name: " << x << std::endl;
         }
 
+        //TODO: The beginning and end indices in the arg parse loop is incorrect, collecting an extra character at the end
+        // inside extractColumnIndice()
         if(check_index.isCreateIndex()) {
             std::cout << "is a create index: " << std::endl;
             std::cout << sql << std::endl;
+           
+            std::vector<std::string> vec = check_index.extractColumnIndice();
+            std::cout << vec.size() << std::endl;
+            for(const auto& x : vec) {
+                std::cout << "col ind: " << x << std::endl;
+            }
         }
         else {
             std::cout << "not create index table" << std::endl;
