@@ -27,77 +27,27 @@ void Database::selectColumnWithWhere(const std::string& query) {
     //std::cout << "flag: " << flag << std::endl;
     database_file.seekg(HEADER_SIZE + 3);
     database_file.read(buf,2);
+    // maps the table name to record content
     unsigned short cell_count = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
-
-    for (int i = 0; i < cell_count; i++) {
-        database_file.seekg(HEADER_SIZE + PAGE_SIZE + (i * 2));
-        database_file.read(buf,2);
-        unsigned short curr_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
-        database_file.seekg(curr_offset);
-        
-
-        unsigned char record[9];
-        //std::cout << "pos: " << database_file.tellg() << std::endl;
-        database_file.read(reinterpret_cast<char*>(record),9);
-        int header_bytes;
-        int offset = 0;
-        //unsigned int header_size = this->parseVarint(reinterpret_cast<unsigned char*>(record[1]), header_bytes);
-        unsigned int header_size = this->parseVarint(record + offset, header_bytes);
-        offset += header_bytes;
-        //std::cout << "pos: " << database_file.tellg() << std::endl;
-        unsigned int header2 = this->parseVarint(record + offset, header_bytes);
-        offset += header_bytes;
-        unsigned int record_header_size = this->parseVarint(record + offset, header_bytes);
-        offset += header_bytes;
-
-
-        database_file.seekg(-(9 - offset), std::ios::cur);
-        char record_header[record_header_size];
-
-        database_file.read(record_header, record_header_size - 1); // -1 because the size of the header is alredy read previously
-        unsigned short type_size, name_size, tbl_name_size, root_size, sql_size; 
-        this->computeSchemaSize(record_header, record_header_size - header_bytes, type_size, name_size, tbl_name_size, root_size, sql_size);
-        //std::cout << cols << std::endl;
-        char type_name[type_size];
-        char table_name[name_size];
-        char tbl[tbl_name_size];
-        char root[root_size];
-        char sql_text[sql_size];
-
-        database_file.read(type_name, type_size);
-        database_file.read(table_name, name_size);
-        database_file.read(tbl, tbl_name_size);
-        database_file.read(root, root_size);
-        database_file.read(sql_text, sql_size);
-        std::vector<std::string> column_names;
-        std::string sql(sql_text, sql_size);
-        size_t start = sql.find('(') + 1;
-        size_t end = sql.find(')');
-        std::string columns_def = sql.substr(start, end - start);
-        std::string table_name_string(table_name, name_size);
-        SQLParser check_index(sql);
-        int root_page = static_cast<unsigned char>(root[0]);
-        for(auto x: tokens["tables"]) {
-            std::cout << "table name: " << x << std::endl;
-        }
-
-        //TODO: The beginning and end indices in the arg parse loop is incorrect, collecting an extra character at the end
-        // inside extractColumnIndice()
-        if(check_index.isCreateIndex()) {
-            std::cout << "is a create index: " << std::endl;
-            std::cout << sql << std::endl;
-           
-            std::vector<std::string> vec = check_index.extractColumnIndice();
-            std::cout << vec.size() << std::endl;
-            for(const auto& x : vec) {
-                std::cout << "col ind: " << x << std::endl;
+    std::vector<std::string> column_names;
+    std::unordered_map<std::string, schemaRecord> records = this->getRecords(cell_count);
+    for(const auto& x : records) {
+        SQLParser s1(x.second.sql);
+        /*if (s1.isCreateIndex()) {
+            std::cout << x.second.sql << std::endl;
+            std::cout << s1.extractNameFromIndexTable() << std::endl;
+        }*/
+        if (std::find(tokens["tables"].begin(), tokens["tables"].end(), x.second.table_name) != tokens["tables"].end()) {
+            auto index_record = this->containsIndexRecord(records, x.second);
+            // checks if an index_table was actually found, if so returns a pointer to the record
+            if (index_record.has_value()) {
+                std::cout << "index found " << std::endl;
+                std::cout << index_record->sql << std::endl;
             }
-        }
-        else {
-            std::cout << "not create index table" << std::endl;
-        }
-        if (std::find(tokens["tables"].begin(), tokens["tables"].end(), table_name_string) != tokens["tables"].end()) {
-            exit(1);
+            size_t start = x.second.sql.find('(') + 1;
+            size_t end = x.second.sql.find(')');
+            std::string columns_def = x.second.sql.substr(start, end - start);
+
             std::istringstream col_stream(columns_def);
             std::string col;
             while(std::getline(col_stream, col, ',')) {
@@ -127,21 +77,21 @@ void Database::selectColumnWithWhere(const std::string& query) {
             }
 
             size_t offset = 0;
-            //int root_page = decodeVarint(root, offset);
-            int root_page = static_cast<unsigned char>(root[0]);
+            int root_page = static_cast<unsigned char>(x.second.root[0]);
 
             int page_offset = (root_page - 1) * page_size;
             char buf[2];
             database_file.seekg(page_offset);
             database_file.read(buf,1);
-            //TODO: must read the page type and check if it's an interior cell and traverse the B-Tree
             uint32_t flag = static_cast<uint32_t>(buf[0]);
-            //std::cout << "page_type: " << flag << std::endl;
+            std::cout << "flag: " << flag << std::endl;
+            exit(1);
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
             col_indices, index_to_name, *this);
             break;
         }
     }
+    
 }
 void Database::selectColumn(const std::string& query) {
     auto page_size = this->getPageSize();

@@ -1,8 +1,86 @@
 #include "../include/Database.h"
 
+std::optional<schemaRecord> Database::containsIndexRecord(const std::unordered_map<std::string, schemaRecord>& records, const schemaRecord& record) const {
+    for (const auto& x : records) {
+        if (x.second.is_index) {
+            SQLParser s1(x.second.sql);
+            std::string str = s1.extractNameFromIndexTable();
+            if(str == record.table_name) {
+                return x.second;
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+std::unordered_map<std::string, schemaRecord> Database::getRecords(unsigned short cell_count) const {
+    std::unordered_map<std::string, schemaRecord> records;
+    for (int i = 0; i < cell_count; i++) {
+        char buf[2];
+        database_file.seekg(HEADER_SIZE + PAGE_SIZE + (i * 2));
+        database_file.read(buf,2);
+        unsigned short curr_offset = ((static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]));
+        database_file.seekg(curr_offset);
+
+        unsigned char record[9];
+        database_file.read(reinterpret_cast<char*>(record), 9);
+        int header_bytes;
+        int offset = 0;
+
+        unsigned int header_size = parseVarint(record + offset, header_bytes);
+        offset += header_bytes;
+
+        unsigned int header2 = parseVarint(record + offset, header_bytes);
+        offset += header_bytes;
+
+        unsigned int record_header_size = parseVarint(record + offset, header_bytes);
+        offset += header_bytes;
+
+        database_file.seekg(-(9 - offset), std::ios::cur);
+        char record_header[record_header_size];
+        
+        database_file.read(record_header, record_header_size - 1);
+        unsigned short type_size, name_size, tbl_name_size, root_size, sql_size; 
+        this->computeSchemaSize(record_header, record_header_size - header_bytes, type_size, name_size, tbl_name_size, root_size, sql_size);
+
+        char type_name[type_size];
+        char table_name[name_size];
+        char tbl[tbl_name_size];
+        char root[root_size];
+        char sql_text[sql_size];
+
+        database_file.read(type_name, type_size);
+        database_file.read(table_name, name_size);
+        database_file.read(tbl, tbl_name_size);
+        database_file.read(root, root_size);
+        database_file.read(sql_text, sql_size);
+        std::vector<std::string> column_names;
+        std::string sql_string(sql_text, sql_size);
+        size_t start = sql_string.find('(') + 1;
+        size_t end = sql_string.find(')');
+        std::string columns_def = sql_string.substr(start, end - start);
+        std::string type_name_string(type_name, type_size);
+        std::string table_name_string(table_name, name_size);
+        std::string tbl_string(tbl, tbl_name_size);
+        std::string root_string(root, root_size);
+        
+        SQLParser check_index(sql_string);
+        schemaRecord table_record = {type_name_string,table_name_string, tbl_string, root_string,sql_string};
+        if (check_index.isCreateIndex()) {
+            std::cout << "is_index" << std::endl;
+            table_record.is_index = true;
+        }
+        records[table_name_string] = table_record;
+    }
+    return records;
+}
+bool Database::isMatchingIndex(const schemaRecord& record, const std::string& table_name_string) const {
+    std::string record_table_string = record.table_name;
+    return record_table_string == table_name_string;
+}
+
 std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types, uint64_t& rowid) const {
     std::vector<std::string> column_values;
-    //column_values.push_back(std::to_string(rowid));
     for(size_t m = 0; m < serial_types.size(); ++m) {
         uint64_t stype = serial_types[m];
         int size = 0;
@@ -132,15 +210,6 @@ void Database::computeSchemaSize(const char* record_header,
     unsigned short &sql_size ) const {
     std::vector<unsigned int> serial_types;
     int offset = 0;
-    //std::cout << "header size : " << size << std::endl;
-    /*
-    for (int j = 0; j < size; j++) {
-        int bytes_read = 0;
-        unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);
-        serial_types.push_back(serial_type);
-        offset += bytes_read;
-        std::cout << "t: " << bytes_read << " " << (static_cast<unsigned short>(serial_type) - 13) / 2 << std::endl;
-    }*/
     while(offset < size) {
         int bytes_read = 0;
         unsigned int serial_type = this->parseVarint(reinterpret_cast<const unsigned char*>(&record_header[offset]), bytes_read);

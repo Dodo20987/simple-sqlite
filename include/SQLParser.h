@@ -41,6 +41,7 @@ public:
     std::vector<std::string> extractColumnIndice() const; 
     WhereClause parseWhereClause() const;
     const std::string getQuery() const;
+    std::string extractNameFromIndexTable() const;
     void setQuery(const std::string& query);
     std::unordered_map<std::string, std::vector<std::string>> selectQuery() const;
     bool isSelect() const;

@@ -36,27 +36,22 @@ IndexB BTreeNavigator::getPageTypeIndexB(std::ifstream& database_file, uint32_t 
 void BTreeNavigator::readLeafTablePage(std::ifstream& database_file, uint32_t page_offset, SQLParser& string_parser, std::vector<int>& col_indices,
 std::unordered_map<int, std::string>& index_to_name, Database& db) {
     // number of cells
-    //TODO: we have already written the logic inside the select functions so need to
     char buf[2];
     database_file.seekg(page_offset + 3);
     database_file.read(buf,2);
-    //TODO: THE number of rows is not getting computed correctly for the superheroes.db
     unsigned short number_of_rows = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
+    //TODO: the columns with null data is currently getting filled with the rowid
+    // we do not want this behaviour, it should remain null
     for (int k = 0; k < number_of_rows; k++) {
-        //std::cout << "1" << std::endl;
-        //std::cout << "page offset: " << page_offset << std::endl;
         uint64_t rowid = 0;
         std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset,buf,k, rowid);
-        //std::cout << "2" << std::endl;
         std::vector<std::string> column_values = db.extractColumnValues(serial_types, rowid);
-        //std::cout << "3" << std::endl;
         bool is_first_iteration = true;
         std::unordered_map<std::string, std::string> row;
         WhereClause where = string_parser.parseWhereClause();
         for (int col_index : col_indices) {
             if (col_index < column_values.size()) {
                 row[index_to_name[col_index]] = column_values[col_index];
-                //std::cout << "index: " << index_to_name[col_index] << " val: " << row[index_to_name[col_index]] << std::endl;
             }
         }
         if(db.evaluateWhere(where, row)) {
@@ -76,7 +71,7 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
 void BTreeNavigator::traverseBTreePageTableB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser,
 std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db) {
     TableB page_type = this->getPageTypeTableB(database_file, page_number, page_size);
-    IndexB index_type = this->getPageTypeIndexB(database_file, page_number, page_size);
+    //IndexB index_type = this->getPageTypeIndexB(database_file, page_number, page_size);
    //exit(1);
     switch(page_type) {
         case TableB::leafCell: {

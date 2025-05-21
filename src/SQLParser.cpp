@@ -1,12 +1,21 @@
 #include "../include/SQLParser.h"
 
+std::string SQLParser::extractNameFromIndexTable() const {
+    std::stringstream ss(query);
+    std::string result;
+    char delim = ' ';
+    std::vector<std::string> tokens;
+    while(std::getline(ss, result, delim)) {
+        tokens.push_back(result);
+    }
+    return tokens[3];
+}
 std::vector<std::string> SQLParser::extractColumnIndice() const {
     std::string upper_query = query;
     std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
     std::string keyword = "ON ";
     size_t pos = upper_query.find(keyword);
     std::vector<std::string> res;
-    // TODO: using ',' as as the delim, iterate through the string and push into the res array
     if (pos != std::string::npos) {
         pos += keyword.length();
         size_t begin = upper_query.find('(', pos) + 1;
