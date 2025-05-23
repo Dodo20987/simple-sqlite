@@ -152,7 +152,37 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
 
     return column_values;
 }
+std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, char* buf, int index) const {
+    database_file.seekg(page_offset + 8 + (index * 2));
+    database_file.read(buf,2);
+    unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
+    unsigned char varint_buf[9];
+    database_file.seekg(page_offset + cell_offset);
+    int offset = 0;
+    int bytes;
+    uint64_t ignored_val = this->parseVarint(varint_buf + offset, bytes);
+    offset += bytes;
+    database_file.seekg(page_offset + offset + cell_offset);
+    database_file.read(reinterpret_cast<char*>(varint_buf), 9);
 
+    offset = 0;
+    uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
+    offset += bytes;
+
+    std::vector<unsigned char> header(header_size - offset);
+    database_file.seekg(-(9 - offset), std::ios::cur);
+    database_file.read(reinterpret_cast<char*>(header.data()),header_size - offset);
+    
+    std::vector<uint64_t> serial_types;
+    int h_offset = 0;
+
+    while(h_offset < header.size()) {
+        uint64_t serial_type = this->parseVarint(&header[h_offset], bytes);
+        serial_types.push_back(serial_type);
+        h_offset += bytes;
+    }
+    return serial_types;
+}
 std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const {
     database_file.seekg(page_offset + 8 + (index * 2));
     database_file.read(buf,2);
@@ -170,11 +200,6 @@ std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* b
     offset += bytes;
      
     database_file.seekg(page_offset + offset + cell_offset);
-    /*
-    std::cout << "page offset: " << page_offset << " ";
-    std::cout << "offset: " << offset << " ";
-    std::cout << "cell_offset: " << cell_offset << " ";
-    std::cout << "sum " << page_offset + offset + cell_offset << std::endl;*/
     database_file.read(reinterpret_cast<char*>(varint_buf), 9);
     offset = 0;
     uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
@@ -184,6 +209,7 @@ std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* b
     std::cout << "offset: " << offset << std::endl;
     std::cout << "computed: " << header_size - offset << std::endl;*/
     //std::cout << "v1" << std::endl;
+
     std::vector<unsigned char> header(header_size - offset);
     //std::cout << "v2" << std::endl;
     database_file.seekg(-(9 - offset), std::ios::cur);

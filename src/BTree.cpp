@@ -127,17 +127,57 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
     };
 
 }
-
-
-void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size) {
+void BTreeNavigator::parseIndexPayload(std::ifstream&  database_file) const {
+    
+}
+// NOTE: index b tree's all contain a payload, not just the leaf cells
+void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser) {
     IndexB page_type = this->getPageTypeIndexB(database_file, page_number, page_size);
     switch(page_type) {
         case IndexB::leafCell:
             // do something
             break;
-        case IndexB::interiorCell:
-            // do something
+        case IndexB::interiorCell: {
+            uint32_t page_offset = (page_number - 1) * page_size + (page_number == 1 ? 100 : 0);
+            char cell_bytes[2];
+            database_file.seekg(page_offset + 3);
+            database_file.read(cell_bytes,2);
+            uint16_t cell_count = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | 
+            static_cast<unsigned char>(cell_bytes[1]));
+            char right_ptr_bytes[4];
+            database_file.seekg(page_offset + 8);
+            database_file.read(right_ptr_bytes, 4);
+            uint32_t right_child = (static_cast<unsigned char>(right_ptr_bytes[0]) << 24) | 
+            (static_cast<unsigned char>(right_ptr_bytes[1]) << 16) | 
+            (static_cast<unsigned char>(right_ptr_bytes[2]) << 8) | 
+            static_cast<unsigned char>(right_ptr_bytes[3]);
+            std::vector<uint16_t> cell_offsets;
+            for(int i = 0; i < cell_count; i++) {
+                char cell_bytes[2];
+                database_file.read(cell_bytes,2);
+                uint16_t cell_offset = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | 
+                static_cast<unsigned char>(cell_bytes[1]));
+                cell_offsets.push_back(cell_offset);
+            }
+            std::vector<uint32_t> left_pointers;
+            for (auto offset : cell_offsets) {
+                database_file.seekg(page_offset + offset);
+                char buffer[4];
+                database_file.read(buffer, 4);
+                uint32_t left_pointer = (static_cast<unsigned char>(buffer[3]) | (static_cast<unsigned char>(buffer[2]) << 8) |
+                (static_cast<unsigned char>(buffer[1]) << 16) | (static_cast<unsigned char>(buffer[0]) << 24));
+                left_pointers.push_back(left_pointer);
+            }
+            // traverse the left child nodes
+            for (auto& page_num : left_pointers) {
+                this->traverseBTreePageIndexB(database_file, page_num,page_size, string_parser);
+            }
+
+            // traversing the right child nodes
+            this->traverseBTreePageIndexB(database_file, right_child, page_size, string_parser);
+
             break;
+        }
         default:
             return;
     };

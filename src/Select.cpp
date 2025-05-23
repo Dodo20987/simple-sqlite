@@ -15,6 +15,50 @@ uint64_t decodeVarint(const char* data, size_t& offset) {
 
     return result;
 }
+void Database::selectColumnIndex(const schemaRecord& index_record, const SQLParser& string_parser) const {
+    auto page_size = this->getPageSize();
+    int root_page = static_cast<unsigned char>(index_record.root[0]);
+    char buf[2];
+    std::unordered_map<std::string, std::vector<std::string>> tokens = string_parser.selectQuery();
+    std::vector<std::string> column_names;
+    size_t start = index_record.sql.find("(") + 1;
+    size_t end = index_record.sql.find(")");
+    std::string columns_def = index_record.sql.substr(start, end - start);
+    std::istringstream ss(columns_def);
+    std::string col;
+    while(std::getline(ss, col, ',')) {
+        std::istringstream col_word_stream(col);
+        std::string col_name;
+        col_word_stream >> col_name;
+        column_names.push_back(col_name);
+    }
+    std::unordered_map<int, std::string> index_to_name;
+    std::vector<std::vector<std::string>::iterator> matched_iterators;
+    std::vector<int> desired_col_indices;
+    std::vector<int> col_indices;
+    for (const auto& x : tokens["cols"]) {
+        auto it = std::find(column_names.begin(), column_names.end(), x);   
+        if (it != column_names.end()) {
+            matched_iterators.push_back(it);
+        }
+    }
+    for (const auto& x : matched_iterators) {
+        int col_index = std::distance(column_names.begin(), x);
+        desired_col_indices.push_back(col_index);
+    }
+
+    for (size_t i = 0; i < column_names.size(); ++i) {
+        col_indices.push_back(i);
+        index_to_name[i] = column_names[i];
+    }
+    int page_offset = (root_page - 1) * page_size;
+    database_file.seekg(page_offset);
+    database_file.read(buf,2);
+    uint32_t flag = static_cast<unsigned char>(buf[0]);
+
+    std::cout << "flag: " << flag << std::endl;
+    //b_tree_nav.traverseBTreeIndexB(database_file, root_page,page_size,string_parser,);
+}
 void Database::selectColumnWithWhere(const std::string& query) {
     auto page_size = this->getPageSize();
     SQLParser string_parser(query);
@@ -37,12 +81,20 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::cout << x.second.sql << std::endl;
             std::cout << s1.extractNameFromIndexTable() << std::endl;
         }*/
+        std::cout << x.second.table_name << std::endl;
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), x.second.table_name) != tokens["tables"].end()) {
             auto index_record = this->containsIndexRecord(records, x.second);
             // checks if an index_table was actually found, if so returns a pointer to the record
+
+            // Traverse the index table instead of the actual table record if index is found
+            //TODO: Write the logic for selectColumnIndex method,
+            // just traverse the b tree for the record, it uses an index table instead of
+            // a regular table
             if (index_record.has_value()) {
+                this->selectColumnIndex(index_record.value(), string_parser);
                 std::cout << "index found " << std::endl;
                 std::cout << index_record->sql << std::endl;
+                break;
             }
             size_t start = x.second.sql.find('(') + 1;
             size_t end = x.second.sql.find(')');
