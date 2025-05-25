@@ -127,23 +127,47 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
     };
 
 }
-void BTreeNavigator::parseIndexPayload(std::ifstream&  database_file) const {
-    
+void BTreeNavigator::parseIndexPayload(std::ifstream&  database_file, uint32_t page_offset, 
+    uint16_t cell_count, SQLParser& string_parser, Database& db) const {
+    for(int i = 0; i < cell_count; i++) {
+        char buf[2];
+        uint64_t temp = 1;
+        std::vector<uint64_t> serial_types = db.computeIndexSerialTypes(page_offset, buf, i);
+        std::vector<std::string> column_values = db.extractColumnValues(serial_types,temp);
+        bool is_first_iteration = true;
+        std::unordered_map<std::string, std::string> row;
+        WhereClause where = string_parser.parseWhereClause();
+        for (const auto& val : column_values) {
+            if(is_first_iteration) {
+                std::cout << val;
+                is_first_iteration = false;
+            }
+            else std::cout << "|" << val;
+        }
+        std::cout << std::endl;
+    }
 }
 // NOTE: index b tree's all contain a payload, not just the leaf cells
-void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser) {
+void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser, Database& db) {
     IndexB page_type = this->getPageTypeIndexB(database_file, page_number, page_size);
+    uint32_t page_offset = (page_number - 1) * page_size + (page_number == 1 ? 100 : 0);
+    char cell_bytes[2];
+    database_file.seekg(page_offset + 3);
+    database_file.read(cell_bytes,2);
+    uint16_t cell_count = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | static_cast<unsigned char>(cell_bytes[1]));
+    std::cout << "1" << std::endl;
     switch(page_type) {
-        case IndexB::leafCell:
-            // do something
-            break;
-        case IndexB::interiorCell: {
-            uint32_t page_offset = (page_number - 1) * page_size + (page_number == 1 ? 100 : 0);
+        case IndexB::leafCell: {
+            std::cout << "leaf cell found" << std::endl;
+            exit(1);
             char cell_bytes[2];
             database_file.seekg(page_offset + 3);
             database_file.read(cell_bytes,2);
-            uint16_t cell_count = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | 
-            static_cast<unsigned char>(cell_bytes[1]));
+            uint16_t cell_count = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | static_cast<unsigned char>(cell_bytes[1]));
+            this->parseIndexPayload(database_file, page_offset, cell_count, string_parser, db);           
+            break;
+        }
+        case IndexB::interiorCell: {
             char right_ptr_bytes[4];
             database_file.seekg(page_offset + 8);
             database_file.read(right_ptr_bytes, 4);
@@ -168,13 +192,16 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                 (static_cast<unsigned char>(buffer[1]) << 16) | (static_cast<unsigned char>(buffer[0]) << 24));
                 left_pointers.push_back(left_pointer);
             }
+            std::cout << "2" << std::endl;
+            this->parseIndexPayload(database_file, page_offset, cell_count, string_parser, db);
+            std::cout << "3" << std::endl;
             // traverse the left child nodes
             for (auto& page_num : left_pointers) {
-                this->traverseBTreePageIndexB(database_file, page_num,page_size, string_parser);
+                this->traverseBTreePageIndexB(database_file, page_num,page_size, string_parser,db);
             }
 
             // traversing the right child nodes
-            this->traverseBTreePageIndexB(database_file, right_child, page_size, string_parser);
+            this->traverseBTreePageIndexB(database_file, right_child, page_size, string_parser,db);
 
             break;
         }

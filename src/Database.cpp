@@ -152,23 +152,30 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
 
     return column_values;
 }
+//TODO: This function is written incorrectly
 std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, char* buf, int index) const {
-    database_file.seekg(page_offset + 8 + (index * 2));
+    database_file.seekg(page_offset + 12 + (index * 2));
     database_file.read(buf,2);
     unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
-    unsigned char varint_buf[9];
     database_file.seekg(page_offset + cell_offset);
-    int offset = 0;
+    unsigned char varint_buf[9];
+    database_file.read(reinterpret_cast<char*>(varint_buf),9);
+    int offset = 4;
     int bytes;
-    uint64_t ignored_val = this->parseVarint(varint_buf + offset, bytes);
+    //uint32_t left_ptr = this->parseVarint(varint_buf + offset, bytes);
+    //offset += bytes;
+    uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
-    database_file.seekg(page_offset + offset + cell_offset);
-    database_file.read(reinterpret_cast<char*>(varint_buf), 9);
+    database_file.seekg(page_offset + offset +  cell_offset);
 
+
+    database_file.read(reinterpret_cast<char*>(varint_buf),9);
     offset = 0;
     uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
-
+    std::cout << "header_Size: " << header_size << std::endl;
+    std::cout << "offset: " << offset << std::endl;
+    std::cout << "computed: " << header_size - offset << std::endl;
     std::vector<unsigned char> header(header_size - offset);
     database_file.seekg(-(9 - offset), std::ios::cur);
     database_file.read(reinterpret_cast<char*>(header.data()),header_size - offset);
@@ -181,6 +188,9 @@ std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, ch
         serial_types.push_back(serial_type);
         h_offset += bytes;
     }
+    std::cout << "print:" << std::endl;
+    std::cout << "size: " << serial_types.size() << std::endl;
+    //exit(1);
     return serial_types;
 }
 std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const {

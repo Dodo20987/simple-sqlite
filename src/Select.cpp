@@ -15,7 +15,7 @@ uint64_t decodeVarint(const char* data, size_t& offset) {
 
     return result;
 }
-void Database::selectColumnIndex(const schemaRecord& index_record, const SQLParser& string_parser) const {
+void Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser) {
     auto page_size = this->getPageSize();
     int root_page = static_cast<unsigned char>(index_record.root[0]);
     char buf[2];
@@ -57,7 +57,7 @@ void Database::selectColumnIndex(const schemaRecord& index_record, const SQLPars
     uint32_t flag = static_cast<unsigned char>(buf[0]);
 
     std::cout << "flag: " << flag << std::endl;
-    //b_tree_nav.traverseBTreeIndexB(database_file, root_page,page_size,string_parser,);
+    b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,string_parser,*this);
 }
 void Database::selectColumnWithWhere(const std::string& query) {
     auto page_size = this->getPageSize();
