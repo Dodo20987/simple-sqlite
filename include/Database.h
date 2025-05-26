@@ -57,5 +57,5 @@ public:
 
     bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row) const;
     std::vector<uint64_t> computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const;
-    std::vector<uint64_t> computeIndexSerialTypes(uint64_t page_offset, char* buf, int index) const;   
+    std::vector<uint64_t> computeIndexSerialTypes(uint64_t page_offset, char* buf, int index, bool is_leaf) const;   
 };
