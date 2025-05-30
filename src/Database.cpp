@@ -78,7 +78,6 @@ bool Database::isMatchingIndex(const schemaRecord& record, const std::string& ta
     std::string record_table_string = record.table_name;
     return record_table_string == table_name_string;
 }
-
 std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_t>& serial_types, uint64_t& rowid) const {
     std::vector<std::string> column_values;
     for(size_t m = 0; m < serial_types.size(); ++m) {

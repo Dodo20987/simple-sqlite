@@ -54,7 +54,7 @@ public:
     std::vector<std::string> extractColumnValues(const std::vector<uint64_t>& serial_types, uint64_t& rowid) const;
     std::unordered_map<std::string, schemaRecord> getRecords(unsigned short cell_count) const;
     bool isMatchingIndex(const schemaRecord& record, const std::string& table_name_string) const;
-
+    
     bool evaluateWhere(const WhereClause& where, const std::unordered_map<std::string, std::string>& row) const;
     std::vector<uint64_t> computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const;
     std::vector<uint64_t> computeIndexSerialTypes(uint64_t page_offset, char* buf, int index, bool is_leaf) const;   

@@ -14,6 +14,8 @@ enum {
     
 };
 enum class LogicalOp { AND, OR };
+
+// E.g. country = Canada
 struct WhereCondition {
     std::string column;
     std::string operation;
