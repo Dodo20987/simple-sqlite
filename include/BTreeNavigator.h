@@ -32,8 +32,7 @@ public:
     void readInteriorTablePage(int page_offset);
     void readLeafTablePage(std::ifstream& database_file,uint32_t page_offset, SQLParser& string_parser, 
         std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db);
-    void parseIndexPayload(std::ifstream& database_file, uint32_t page_offset, uint16_t cell_offset, SQLParser& string_parser, Database& db, 
-    bool is_leaf) const;
-
-
+    void printRow(const std::unordered_map<std::string, std::string>& row) const;
+    void parseIndexPayload(std::ifstream&  database_file, uint32_t page_offset, 
+    uint16_t cell_count, SQLParser& string_parser, Database& db, bool is_leaf) const ;
 };

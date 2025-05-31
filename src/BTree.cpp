@@ -71,7 +71,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db) {
 void BTreeNavigator::traverseBTreePageTableB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser,
 std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db) {
     TableB page_type = this->getPageTypeTableB(database_file, page_number, page_size);
-   //exit(1);
     switch(page_type) {
         case TableB::leafCell: {
             // extracting the records
@@ -137,9 +136,6 @@ void BTreeNavigator::parseIndexPayload(std::ifstream&  database_file, uint32_t p
         std::unordered_map<std::string, std::string> row;
         WhereClause where = string_parser.parseWhereClause();
 
-        // TODO: Need to traverse the tree by comparing the target name and keys
-        // depending on the outcome, go left or right on the tree and if the key matches target put the rowid in a vector
-        // need to pass in a target string in parameter list
         for (const auto& val : column_values) {
             if(is_first_iteration) {
                 std::cout << val;
@@ -153,6 +149,13 @@ void BTreeNavigator::parseIndexPayload(std::ifstream&  database_file, uint32_t p
 bool isDigits(const std::string& str) {
     return !str.empty() && std::all_of(str.begin(), str.end(), ::isdigit);
 }
+void BTreeNavigator::printRow(const std::unordered_map<std::string, std::string>& row) const {
+    std::cout << "{";
+    for (const auto& val : row) {
+        std::cout << val.first << ": " << val.second << ", ";
+    }
+    std::cout << "}\n" ;
+}
 // NOTE: index b tree's all contain a payload, not just the leaf cells
 void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser,
     WhereClause& clause, Database& db, std::vector<long>& out_id) {
@@ -163,17 +166,17 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
     database_file.read(cell_bytes,2);
     uint16_t cell_count = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | static_cast<unsigned char>(cell_bytes[1]));
     std::vector<std::string> targets = string_parser.extractColumnIndice();
+    /*
     for(auto& s : targets) {
         std::cout << "col: " << s << std::endl;
-    }
-    //exit(1);
+    }*/
     switch(page_type) {
         case IndexB::leafCell: {
             //this->parseIndexPayload(database_file, page_offset, cell_count, string_parser, db, true);           
             for (int i = 0; i < cell_count; i++) {
                 char buf[2];
-                uint64_t temp;
-                std::vector<uint64_t> serial_types = db.computeIndexSerialTypes(page_offset, buf, i, false);
+                uint64_t temp = 1;
+                std::vector<uint64_t> serial_types = db.computeIndexSerialTypes(page_offset, buf, i, true);
                 std::vector<std::string> column_values = db.extractColumnValues(serial_types, temp);
 
                 // mapping the column values to the column names
@@ -184,15 +187,14 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                     index++;
                 }
                 row["rowid"] = column_values.back();
-                bool is_first_iteration = true;
-                //WhereClause where = string_parser.parseWhereClause();
 
                 for (const auto& x : clause.conditions) {
                     for (const auto& row_val : row) {
                         if (row_val.first == x.column && row_val.second == x.value) {
-                            out_id.push_back(std::stol(row["rowid"]));
+                            printRow(row);
                             break;
                         }
+
                     }
                 }
             }
@@ -214,7 +216,6 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                 static_cast<unsigned char>(cell_bytes[1]));
                 cell_offsets.push_back(cell_offset);
             }
-            exit(1);
             std::vector<uint32_t> left_pointers;
             for (auto offset : cell_offsets) {
                 database_file.seekg(page_offset + offset);
@@ -225,23 +226,23 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                 left_pointers.push_back(left_pointer);
             }
             //this->parseIndexPayload(database_file, page_offset, cell_count, string_parser, db, false);
+            // TODO: need to traverse either right or left in this loop
             for(int i = 0; i < cell_count; i++) {
                 ///////////////////////////////////////////////////
                 // getting the left child pointer
                 //////////////////////////////////////////////////
-                uint16_t offset = cell_offsets[i];
+                auto offset = cell_offsets[i];
                 database_file.seekg(page_offset + offset);
                 char buffer[4];
                 database_file.read(buffer, 4);
                 uint32_t left_pointer = (static_cast<unsigned char>(buffer[3]) | (static_cast<unsigned char>(buffer[2]) << 8) |
                 (static_cast<unsigned char>(buffer[1]) << 16) | (static_cast<unsigned char>(buffer[0]) << 24));
 
-
+                //this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
                 char buf[2];
                 uint64_t temp = 1;
                 std::vector<uint64_t> serial_types = db.computeIndexSerialTypes(page_offset, buf, i, false);
                 std::vector<std::string> column_values = db.extractColumnValues(serial_types, temp);
-
                 // mapping the column values to the column names
                 std::unordered_map<std::string, std::string> row;
                 int index = 0;
@@ -250,32 +251,23 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                     index++;
                 }
                 row["rowid"] = column_values.back();
-                bool is_first_iteration = true;
-                WhereClause where = string_parser.parseWhereClause();
-                // out_id holds the output row ids
-                bool go_left = false;
-                for (const auto& x : clause.conditions) {
+                //printRow(row);
+                //this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
+                for(const auto& x : clause.conditions) {
                     for (const auto& row_val : row) {
-                        if(row_val.first == x.column && row_val.second > x.value) {
-                            go_left = true;
+                        if (row_val.first == x.column && row_val.second > x.value) {
+                            this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
                             break;
                         }
                         else if (row_val.first == x.column && row_val.second == x.value) {
-                            go_left = true;
-                            out_id.push_back(std::stol(row["rowid"]));
+                            printRow(row);
+                            this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
                             break;
                         }
                     }
                 }
-
-                if (go_left) {
-                    this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db);
-                    return;
-                }
-
-                // traverse the left child
-                this->traverseBTreePageIndexB(database_file, right_child, page_size, string_parser, clause, db);
             }
+            this->traverseBTreePageIndexB(database_file, right_child, page_size, string_parser, clause, db, out_id);
             break;
         }
         default:

@@ -39,7 +39,7 @@ private:
     void computeSchemaSize(const char* record_header,unsigned short size, unsigned short& type_size, unsigned short& name_size, 
         unsigned short& tbl_name_size, unsigned short& root_size,unsigned short& sql_size) const;
     std::optional<schemaRecord> containsIndexRecord(const std::unordered_map<std::string, schemaRecord>& records, const schemaRecord& record) const;
-    void selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser);
+    std::vector<long> selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser);
     
 public:
     Database(std::ifstream&& database_file, BTreeNavigator nav) : database_file(std::move(database_file)), b_tree_nav(nav) {}

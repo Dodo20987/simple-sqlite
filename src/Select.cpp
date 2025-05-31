@@ -15,10 +15,11 @@ uint64_t decodeVarint(const char* data, size_t& offset) {
 
     return result;
 }
-void Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser) {
+std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser) {
     auto page_size = this->getPageSize();
     int root_page = static_cast<unsigned char>(index_record.root[0]);
     char buf[2];
+    std::vector<long> out_id;
     std::unordered_map<std::string, std::vector<std::string>> tokens = string_parser.selectQuery();
     WhereClause clause = string_parser.parseWhereClause();
     std::cout << "clauses: " << clause.conditions.size() << std::endl;
@@ -30,18 +31,14 @@ void Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& st
     std::istringstream ss(columns_def);
     std::string col;
     SQLParser index_parser(index_record.sql);
-    std::cout << "sql: " << index_record.sql << std::endl;
+    //std::cout << "sql: " << index_record.sql << std::endl;
     std::vector<std::string> indices = index_parser.extractColumnIndice();
     std::cout << "conditions\n";
     for (const auto& x : clause.conditions) {
-        std::cout << "cols: " << x.column << std::endl;
-        std::cout << "op: " << x.operation << std::endl;
-        std::cout << "val: " << x.value << std::endl;
         if (std::find(indices.begin(), indices.end(), x.column) != indices.end()) {
             key_values.push_back(x.value);
         }
     }
-    //exit(1);
     while(std::getline(ss, col, ',')) {
         std::istringstream col_word_stream(col);
         std::string col_name;
@@ -72,8 +69,12 @@ void Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& st
     database_file.read(buf,2);
     uint32_t flag = static_cast<unsigned char>(buf[0]);
 
-    std::cout << "flag: " << flag << std::endl;
-    b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,index_parser,clause, *this);
+    std::cout << "index flag: " << flag << std::endl;
+
+    
+    b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,index_parser,clause,*this, out_id);
+
+    return out_id;
 }
 void Database::selectColumnWithWhere(const std::string& query) {
     auto page_size = this->getPageSize();
@@ -93,20 +94,15 @@ void Database::selectColumnWithWhere(const std::string& query) {
     std::unordered_map<std::string, schemaRecord> records = this->getRecords(cell_count);
     for(const auto& x : records) {
         SQLParser s1(x.second.sql);
-        /*if (s1.isCreateIndex()) {
-            std::cout << x.second.sql << std::endl;
-            std::cout << s1.extractNameFromIndexTable() << std::endl;
-        }*/
-        std::cout << x.second.table_name << std::endl;
+        //std::cout << x.second.table_name << std::endl;
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), x.second.table_name) != tokens["tables"].end()) {
             auto index_record = this->containsIndexRecord(records, x.second);
             // checks if an index_table was actually found, if so returns a pointer to the record
-
+            std::vector<long> out_id;
             if (index_record.has_value()) {
-                this->selectColumnIndex(index_record.value(), string_parser);
+                out_id = this->selectColumnIndex(index_record.value(), string_parser);
                 std::cout << "index found " << std::endl;
                 std::cout << index_record->sql << std::endl;
-                break;
             }
             size_t start = x.second.sql.find('(') + 1;
             size_t end = x.second.sql.find(')');
@@ -148,7 +144,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
             database_file.seekg(page_offset);
             database_file.read(buf,1);
             uint32_t flag = static_cast<uint32_t>(buf[0]);
-            std::cout << "flag: " << flag << std::endl;
+            std::cout << "where flag: " << flag << std::endl;
             exit(1);
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
             col_indices, index_to_name, *this);
