@@ -191,6 +191,7 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                 for (const auto& x : clause.conditions) {
                     for (const auto& row_val : row) {
                         if (row_val.first == x.column && row_val.second == x.value) {
+                            out_id.push_back(std::stol(row["rowid"]));
                             printRow(row);
                             break;
                         }
@@ -261,6 +262,7 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                         }
                         else if (row_val.first == x.column && row_val.second == x.value) {
                             printRow(row);
+                            out_id.push_back(std::stol(row["rowid"]));
                             this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
                             break;
                         }

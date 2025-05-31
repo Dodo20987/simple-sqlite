@@ -71,7 +71,6 @@ std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, 
 
     std::cout << "index flag: " << flag << std::endl;
 
-    
     b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,index_parser,clause,*this, out_id);
 
     return out_id;
@@ -102,7 +101,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
             if (index_record.has_value()) {
                 out_id = this->selectColumnIndex(index_record.value(), string_parser);
                 std::cout << "index found " << std::endl;
-                std::cout << index_record->sql << std::endl;
+                std::cout << "rows: " << out_id.size() << std::endl;
             }
             size_t start = x.second.sql.find('(') + 1;
             size_t end = x.second.sql.find(')');
