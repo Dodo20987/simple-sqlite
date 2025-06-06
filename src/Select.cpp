@@ -100,6 +100,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
             std::vector<long> out_id;
             if (index_record.has_value()) {
                 out_id = this->selectColumnIndex(index_record.value(), string_parser);
+                std::sort(out_id.begin(), out_id.end());
                 std::cout << "index found " << std::endl;
                 std::cout << "rows: " << out_id.size() << std::endl;
             }
@@ -144,9 +145,9 @@ void Database::selectColumnWithWhere(const std::string& query) {
             database_file.read(buf,1);
             uint32_t flag = static_cast<uint32_t>(buf[0]);
             std::cout << "where flag: " << flag << std::endl;
-            exit(1);
+            //exit(1);
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
-            col_indices, index_to_name, *this);
+            col_indices, index_to_name, *this, out_id);
             break;
         }
     }
