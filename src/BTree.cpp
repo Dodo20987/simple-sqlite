@@ -121,35 +121,37 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
                 row_id = db.parseVarint(varint_buf, bytes_read);
                 row_ids.push_back(row_id);
             }
-            for(size_t i = 0; i < 20; i++) { 
-                std::cout << "collected id: " << out_id[i] << std::endl;
-            }
-            for(auto i : row_ids) {
-                std::cout << "row id: " << i << std::endl;
-            }
-            exit(1);
-
             //checking if we need to go to left subtree
+            /*
             for(size_t i = 0; i < left_pointers.size(); i++) {
+                std::vector<long> filtered_ids;
                 for(long id : out_id) {
                     if (id <= row_ids[i]) {
-                        traverseBTreePageTableB(database_file, left_pointers[i], page_size, string_parser, col_indices,
-                        index_to_name, db, out_id);
-                        break;
+                        filtered_ids.push_back(id);
                     }
                 }
-            }
-            /*
-            for (auto& page_num : left_pointers) {
-                traverseBTreePageTableB(database_file, page_num, page_size, string_parser,col_indices, index_to_name, db, out_id);
-            }*/
-            // check if we need to go to the right child
-            for (long id : out_id) {
-                if (id > row_ids.back()) {
-                    traverseBTreePageTableB(database_file, right_child, page_size, string_parser, col_indices, index_to_name,db, out_id);       
+
+                if(!filtered_ids.empty()) {
+                    traverseBTreePageTableB(database_file, left_pointers[i], page_size, string_parser, col_indices,
+                    index_to_name, db, out_id);
                 }
             }
-            
+     
+            // check if we need to go to the right child
+            std::vector<long> right_ids;
+            for (long id : out_id) {
+                if (id > row_ids.back()) {
+                    right_ids.push_back(id);
+                }
+            }*/
+            for(auto left_pointer : left_pointers) {
+                traverseBTreePageTableB(database_file, left_pointer, page_size, string_parser, col_indices,
+                index_to_name, db, out_id);
+            }
+
+            //if (!right_ids.empty()) {
+                traverseBTreePageTableB(database_file, right_child, page_size, string_parser, col_indices, index_to_name,db, out_id);       
+            //}
             break;
         }
         default:
@@ -192,14 +194,17 @@ void BTreeNavigator::printRow(const std::unordered_map<std::string, std::string>
 }
 // NOTE: index b tree's all contain a payload, not just the leaf cells
 void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser,
-    WhereClause& clause, Database& db, std::vector<long>& out_id) {
+    WhereClause& clause, Database& db, std::vector<long>& out_id, const std::vector<std::string>& targets) {
     IndexB page_type = this->getPageTypeIndexB(database_file, page_number, page_size);
     uint32_t page_offset = (page_number - 1) * page_size + (page_number == 1 ? 100 : 0);
     char cell_bytes[2];
     database_file.seekg(page_offset + 3);
     database_file.read(cell_bytes,2);
     uint16_t cell_count = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | static_cast<unsigned char>(cell_bytes[1]));
-    std::vector<std::string> targets = string_parser.extractColumnIndice();
+    if (cell_count == 0) {
+        return;
+    }
+    //std::vector<std::string> targets = string_parser.extractColumnIndice();
     switch(page_type) {
         case IndexB::leafCell: {
             //this->parseIndexPayload(database_file, page_offset, cell_count, string_parser, db, true);           
@@ -210,20 +215,22 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                 std::vector<std::string> column_values = db.extractColumnValues(serial_types, temp);
 
                 // mapping the column values to the column names
-                std::unordered_map<std::string, std::string> row;
-                int index = 0;
-                for (const auto& col_name : targets) {
-                    row[col_name] = column_values[index];
-                    index++;
-                }
-                row["rowid"] = column_values.back();
+                if(!clause.conditions.empty()) {
+                    std::unordered_map<std::string, std::string> row;
+                    int index = 0;
+                    for (const auto& col_name : targets) {
+                        row[col_name] = column_values[index];
+                        index++;
+                    }
+                    row["rowid"] = column_values.back();
 
-                for (const auto& x : clause.conditions) {
-                    const std::string& key_val = row[x.column];
-                    if (key_val == x.value) {
-                        out_id.push_back(std::stol(row["rowid"]));
-                        //printRow(row);
-                        break;
+                    for (const auto& x : clause.conditions) {
+                        const std::string& key_val = row[x.column];
+                        if (key_val == x.value) {
+                            out_id.push_back(std::stol(row["rowid"]));
+                            //printRow(row);
+                            break;
+                        }
                     }
                 }
             }
@@ -237,20 +244,22 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
             (static_cast<unsigned char>(right_ptr_bytes[1]) << 16) | 
             (static_cast<unsigned char>(right_ptr_bytes[2]) << 8) | 
             static_cast<unsigned char>(right_ptr_bytes[3]);
-            std::vector<uint16_t> cell_offsets;
+
+            std::vector<uint16_t> cell_offsets(cell_count);
             for(int i = 0; i < cell_count; i++) {
                 char cell_bytes[2];
                 database_file.read(cell_bytes,2);
-                uint16_t cell_offset = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | 
+                cell_offsets[i] = ((static_cast<unsigned char>(cell_bytes[0]) << 8) | 
                 static_cast<unsigned char>(cell_bytes[1]));
-                cell_offsets.push_back(cell_offset);
             }
-            bool went_left = false;
-            for(int i = 0; i < cell_count; i++) {
-                ///////////////////////////////////////////////////
-                // getting the left child pointer
-                //////////////////////////////////////////////////
-                auto offset = cell_offsets[i];
+
+            int left = 0;
+            int right = cell_count - 1;
+            bool found_match = false;
+
+            while(left <= right) {
+                int mid = left + (right - left) / 2;
+                auto offset = cell_offsets[mid];
                 database_file.seekg(page_offset + offset);
                 char buffer[4];
                 database_file.read(buffer, 4);
@@ -259,37 +268,44 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
 
                 char buf[2];
                 uint64_t temp = 1;
-                std::vector<uint64_t> serial_types = db.computeIndexSerialTypes(page_offset, buf, i, false);
+                std::vector<uint64_t> serial_types = db.computeIndexSerialTypes(page_offset, buf, mid, false);
                 std::vector<std::string> column_values = db.extractColumnValues(serial_types, temp);
-                // mapping the column values to the column names
+
                 std::unordered_map<std::string, std::string> row;
                 int index = 0;
-                for (const auto& col_name : targets) {
-                    row[col_name] = column_values[index];
-                    index++;
+                for(const auto& col_name : targets) {
+                    row[col_name] = column_values[index++];
                 }
                 row["rowid"] = column_values.back();
-                bool go_left = false;
+                bool should_go_left = false;    
                 for(const auto& x : clause.conditions) {
                     const std::string& key_val = row[x.column];
-                    if (key_val > x.value) {
-                        this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
-                        went_left = true;
+                    if(key_val > x.value) {
+                        should_go_left = true;
+                        // go to the left subtree
+                        traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id, targets);
+                        right = mid - 1;
                         break;
                     }
-                    else if (key_val == x.value) {
-                        //printRow(row);
+                    else if(key_val == x.value) {
                         out_id.push_back(std::stol(row["rowid"]));
-                        this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id);
-                        went_left = true;
+                        should_go_left = true;
+                        found_match = true;
+                        // go to the left subtree
+                        traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id, targets);
+                        right = mid - 1;
                         break;
                     }
-                    //}
+                }
+                if(!should_go_left) {
+                    left = mid + 1;
                 }
             }
 
-            if (!went_left)
-                this->traverseBTreePageIndexB(database_file, right_child, page_size, string_parser, clause, db, out_id);
+            if (found_match || left > cell_count - 1) {
+                traverseBTreePageIndexB(database_file, right_child, page_size, string_parser, clause, db, out_id, targets);
+            }
+
             break;
         }
         default:

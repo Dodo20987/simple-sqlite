@@ -22,7 +22,7 @@ std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, 
     std::vector<long> out_id;
     std::unordered_map<std::string, std::vector<std::string>> tokens = string_parser.selectQuery();
     WhereClause clause = string_parser.parseWhereClause();
-    std::cout << "clauses: " << clause.conditions.size() << std::endl;
+    //std::cout << "clauses: " << clause.conditions.size() << std::endl;
     std::vector<std::string> key_values;
     std::vector<std::string> column_names;
     size_t start = index_record.sql.find("(") + 1;
@@ -33,7 +33,7 @@ std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, 
     SQLParser index_parser(index_record.sql);
     //std::cout << "sql: " << index_record.sql << std::endl;
     std::vector<std::string> indices = index_parser.extractColumnIndice();
-    std::cout << "conditions\n";
+    //std::cout << "conditions\n";
     for (const auto& x : clause.conditions) {
         if (std::find(indices.begin(), indices.end(), x.column) != indices.end()) {
             key_values.push_back(x.value);
@@ -69,9 +69,9 @@ std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, 
     database_file.read(buf,2);
     uint32_t flag = static_cast<unsigned char>(buf[0]);
 
-    std::cout << "index flag: " << flag << std::endl;
-
-    b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,index_parser,clause,*this, out_id);
+    //std::cout << "index flag: " << flag << std::endl;
+    std::vector<std::string> targets = index_parser.extractColumnIndice();
+    b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,index_parser,clause,*this, out_id, targets);
 
     return out_id;
 }
@@ -101,8 +101,8 @@ void Database::selectColumnWithWhere(const std::string& query) {
             if (index_record.has_value()) {
                 out_id = this->selectColumnIndex(index_record.value(), string_parser);
                 std::sort(out_id.begin(), out_id.end());
-                std::cout << "index found " << std::endl;
-                std::cout << "rows: " << out_id.size() << std::endl;
+                //std::cout << "index found " << std::endl;
+                //std::cout << "rows: " << out_id.size() << std::endl;
             }
             size_t start = x.second.sql.find('(') + 1;
             size_t end = x.second.sql.find(')');
@@ -144,8 +144,9 @@ void Database::selectColumnWithWhere(const std::string& query) {
             database_file.seekg(page_offset);
             database_file.read(buf,1);
             uint32_t flag = static_cast<uint32_t>(buf[0]);
-            std::cout << "where flag: " << flag << std::endl;
+            //std::cout << "where flag: " << flag << std::endl;
             //exit(1);
+            //break;
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
             col_indices, index_to_name, *this, out_id);
             break;

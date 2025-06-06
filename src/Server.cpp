@@ -7,6 +7,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
 #include <unordered_map>
 #include "../include/Database.h"
 #include "../include/SQLParser.h"
@@ -49,6 +50,7 @@ int main(int argc, char* argv[]) {
     BTreeNavigator nav;
     Database d1(std::move(database_file),nav);
     while(true) {
+        auto start = std::chrono::high_resolution_clock::now();
         accept_input();
         std::getline(std::cin, input);
 
@@ -73,6 +75,10 @@ int main(int argc, char* argv[]) {
                 d1.selectColumn(input);
             }
         }
+        auto end = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double> duration = end - start;
+        std::cout << "Elapsed time: " << duration.count() << " seconds" << std::endl;
     }
     database_file.close();
 
