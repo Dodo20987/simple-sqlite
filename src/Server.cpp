@@ -12,23 +12,11 @@
 #include "../include/Database.h"
 #include "../include/SQLParser.h"
 #include "../include/BTreeNavigator.h"
-void string_parse_test(const std::string& query) {
-    SQLParser sql(query);
-    auto res = sql.selectQuery();
-    std::cout << "col_names: " << std::endl;
-    for (const auto& x : res["cols"]) {
-        std::cout << x << std::endl;
-    }
-    std::cout << "table names: " << std::endl;
 
-    for (const auto& x : res["tables"]) {
-        std::cout << x << std::endl;
-    }
-}
 void accept_input() {
     std::cout << "sqlite> ";
 }
-//TODO: instead of parsing the sql query by position use regex on the query
+
 int main(int argc, char* argv[]) {
     // Flush after every std::cout / std::cerr
     std::cout << std::unitbuf;
@@ -49,6 +37,9 @@ int main(int argc, char* argv[]) {
     std::ifstream database_file(database_file_path, std::ios::binary | std::ios::ate);
     BTreeNavigator nav;
     Database d1(std::move(database_file),nav);
+
+    //TODO: When text is typed into shell not related to the relevant inputs we get a seg fault
+    // parse the string instead of using an else
     while(true) {
         auto start = std::chrono::high_resolution_clock::now();
         accept_input();

@@ -26,7 +26,7 @@ private:
 public:
     BTreeNavigator() {}
     void traverseBTreePageTableB(std::ifstream& database_file, uint32_t page_number,int page_size, SQLParser& string_parser,
-    std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db, const std::vector<long>& out_id);
+    std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db, const std::vector<unsigned long>& out_id);
     void traverseBTreePageIndexB(std::ifstream& database_file, uint32_t page_number,int page_size, SQLParser& string_parser,WhereClause& clause, 
         Database& db, std::vector<long>& out_id, const std::vector<std::string>& targets);
     void readInteriorTablePage(int page_offset);

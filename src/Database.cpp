@@ -152,7 +152,6 @@ std::vector<std::string> Database::extractColumnValues(const std::vector<uint64_
     return column_values;
 }
 
-//TODO: need to rework this function so that it also works with index leaf cells instead of just index interior cells
 std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, char* buf, int index, bool is_leaf) const {
     if(!is_leaf)
         database_file.seekg(page_offset + 12 + (index * 2));
@@ -169,8 +168,7 @@ std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, ch
     else
         offset = 0;
     int bytes;
-    //uint32_t left_ptr = this->parseVarint(varint_buf + offset, bytes);
-    //offset += bytes;
+    
     uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
     database_file.seekg(page_offset + offset + cell_offset);
@@ -180,10 +178,7 @@ std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, ch
     offset = 0;
     uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
-    /*
-    std::cout << "header_Size: " << header_size << std::endl;
-    std::cout << "offset: " << offset << std::endl;
-    std::cout << "computed: " << header_size - offset << std::endl;*/
+
     std::vector<unsigned char> header(header_size - offset);
     database_file.seekg(-(9 - offset), std::ios::cur);
     database_file.read(reinterpret_cast<char*>(header.data()),header_size - offset);
@@ -196,10 +191,7 @@ std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, ch
         serial_types.push_back(serial_type);
         h_offset += bytes;
     }
-    /*
-    std::cout << "print:" << std::endl;
-    std::cout << "size: " << serial_types.size() << std::endl;*/
-    //exit(1);
+    
     return serial_types;
 }
 std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const {
@@ -215,7 +207,6 @@ std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* b
     uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
     rowid = this->parseVarint(varint_buf + offset, bytes);
-    //std::cout << rowid << "|";
     offset += bytes;
      
     database_file.seekg(page_offset + offset + cell_offset);
@@ -223,14 +214,9 @@ std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* b
     offset = 0;
     uint64_t header_size = this->parseVarint(varint_buf + offset, bytes);
     offset += bytes;
-    /*
-    std::cout << "header_Size: " << header_size << std::endl;
-    std::cout << "offset: " << offset << std::endl;
-    std::cout << "computed: " << header_size - offset << std::endl;*/
-    //std::cout << "v1" << std::endl;
+    
 
     std::vector<unsigned char> header(header_size - offset);
-    //std::cout << "v2" << std::endl;
     database_file.seekg(-(9 - offset), std::ios::cur);
     database_file.read(reinterpret_cast<char*>(header.data()), header_size - offset);
 
@@ -298,12 +284,10 @@ int64_t Database::parseVarint(const unsigned char* data, int& bytes_read) const 
         result = (result << 7) | (data[i] & 0x7F);
         bytes_read++;
         if ((data[i] & 0x80) == 0) {
-            //std::cout << "i: " << i << std::endl;
             return result;
         }
     }
 
-    // Special case: 9th byte is stored as full 8 bits
     result = (result << 8) | data[8];
     bytes_read = 9;
     std::cout << "res: " << std::endl;
@@ -315,8 +299,6 @@ bool Database::evaluateCondition(const WhereCondition& cond, const std::unordere
     if (it == row.end()) return false; // col does not exist
 
     const std::string& val = it->second;
-    //std::cout << "cond col: " << cond.column << std::endl;
-    //std::cout << "val: " << val << std::endl;
     if (cond.operation == "=") return val == cond.value;
     if (cond.operation == "!=") return val != cond.value;
     if (cond.operation == "<") return std::stod(val) < std::stod(cond.value);
@@ -332,11 +314,8 @@ bool Database::evaluateWhere(const WhereClause& where, const std::unordered_map<
     if (where.conditions.empty()) return true;
     
     bool result = evaluateCondition(where.conditions[0], row);
-    //std::cout << "logic size" << where.logic.size() << std::endl;
-    //std::cout << "cond: " << "{" << where.conditions[0].column << where.conditions[0].operation << where.conditions[0].value << "}" << std::endl;
-    //std::cout << "res: " << result << std::endl;
+    
     for (size_t i = 0; i < where.logic.size(); i++) {
-        //std::cout << "cond: " << "{" << where.conditions[i].column << where.conditions[i].operation << where.conditions[i].value << "}" << std::endl;
         bool next = evaluateCondition(where.conditions[i + 1], row);
         if (where.logic[i] == LogicalOp::AND) result = result && next;
         else result = result || next;
