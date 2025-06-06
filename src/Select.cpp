@@ -102,7 +102,8 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 out_id = this->selectColumnIndex(index_record.value(), string_parser);
                 std::sort(out_id.begin(), out_id.end());
                 //std::cout << "index found " << std::endl;
-                //std::cout << "rows: " << out_id.size() << std::endl;
+                std::cout << "rows: " << out_id.size() << std::endl;
+                break;
             }
             size_t start = x.second.sql.find('(') + 1;
             size_t end = x.second.sql.find(')');
