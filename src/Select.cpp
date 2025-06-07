@@ -15,7 +15,7 @@ uint64_t decodeVarint(const char* data, size_t& offset) {
 
     return result;
 }
-std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser) {
+std::vector<unsigned long> Database::selectColumnIndex(const schemaRecord& index_record, SQLParser& string_parser) {
     auto page_size = this->getPageSize();
     int root_page = static_cast<unsigned char>(index_record.root[0]);
     char buf[2];
@@ -70,7 +70,7 @@ std::vector<long> Database::selectColumnIndex(const schemaRecord& index_record, 
     uint32_t flag = static_cast<unsigned char>(buf[0]);
 
     std::vector<std::string> targets = index_parser.extractColumnIndice();
-    b_tree_nav.traverseBTreePageIndexB(database_file, root_page,page_size,index_parser,clause,*this, out_id, targets);
+    b_tree_nav.traverseBTreePageIndexB(database_file, root_page, page_size, index_parser, clause, *this, out_id, targets);
 
     return out_id;
 }
@@ -94,7 +94,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
         if (std::find(tokens["tables"].begin(), tokens["tables"].end(), x.second.table_name) != tokens["tables"].end()) {
             auto index_record = this->containsIndexRecord(records, x.second);
 
-            std::vector<long> out_id;
+            std::vector<unsigned long> out_id;
             if (index_record.has_value()) {
                 out_id = this->selectColumnIndex(index_record.value(), string_parser);
                 std::sort(out_id.begin(), out_id.end());
