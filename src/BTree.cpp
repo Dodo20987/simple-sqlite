@@ -49,14 +49,11 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
         int start_pos = 0;
         int end_pos = number_of_rows - 1;
         std::vector<uint64_t> row_ids(number_of_rows);
-        for (int i = 0; i < number_of_rows; i++) {
-            row_ids[i] = db.computeRowId(page_offset, buf, i);
-        }
         //std::cout << "leaf cell row id len: " << row_ids.size() << std::endl;
         // Binary search to find the first potential match
         while (start_pos <= end_pos) {
             int mid = start_pos + (end_pos - start_pos) / 2;
-            uint64_t rowid = row_ids[mid];
+            uint64_t rowid = db.computeRowId(page_offset, buf, mid);
             //std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, mid, rowid);
             
             if (rowid >= out_id.front()) {
@@ -65,7 +62,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
                 start_pos = mid + 1;
             }
         }
-        
         // Parse WHERE clause once outside the loop
         WhereClause where = string_parser.parseWhereClause();
         // Pre-allocate the row map with expected size
@@ -74,25 +70,22 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
         
         // Now process only cells that might contain our target rowids
         // TODO: looping here is not necessary cause we used binary search
-        for (int k = start_pos; k < number_of_rows; k++) {
+        //for (int k = start_pos; k < number_of_rows; k++) {
             //uint64_t rowid = 0;
             // Get rowid from computeSerialTypes but don't use the serial types yet
-            uint64_t rowid = db.computeRowId(page_offset, buf, k);
+            uint64_t rowid = db.computeRowId(page_offset, buf, start_pos);
             //std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, k, rowid);
             
             // If we've gone past our target range, stop processing
-            if (rowid > out_id.back()) {
-                break;
-            }
             
             // Only process if this rowid is in our target list
             if (std::binary_search(out_id.begin(), out_id.end(), rowid)) {
                 // We already have the serial types, so just use them
-                std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, k, rowid);
+                std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, start_pos, rowid);
                 std::vector<std::string> column_values = db.extractColumnValues(serial_types, rowid);
                 std::cout << "end: " << end_pos << std::endl;
                 std::cout << "start: " << start_pos << std::endl;
-                std::cout << "found at idx: " << k << std::endl;
+                //std::cout << "found at idx: " << k << std::endl;
                 std::cout << "num rows: " << number_of_rows << std::endl;
                 std::cout << "front: " << out_id.front() << std::endl;
                 // Clear the row map instead of creating a new one
@@ -117,7 +110,10 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
                     std::cout << std::endl;
                 }
             }
-        }
+            else {
+                return;
+            }
+        //}
     } else {
         // Original behavior when no target rowids are provided
         for (int k = 0; k < number_of_rows; k++) {
@@ -199,7 +195,6 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
                 rowid = db.parseVarint(varint_buf, bytes_read);
                 row_ids.push_back(rowid);
             }
-            std::cout << "interior row id's len: " << row_ids.size() << std::endl;
             // If we have no target rowids or no cells, traverse everything
             if (out_id.empty() || cell_count == 0) {
                 // Traverse all pages
