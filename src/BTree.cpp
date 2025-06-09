@@ -73,47 +73,48 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
         //for (int k = start_pos; k < number_of_rows; k++) {
             //uint64_t rowid = 0;
             // Get rowid from computeSerialTypes but don't use the serial types yet
-            uint64_t rowid = db.computeRowId(page_offset, buf, start_pos);
-            //std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, k, rowid);
             
             // If we've gone past our target range, stop processing
             
             // Only process if this rowid is in our target list
-            if (std::binary_search(out_id.begin(), out_id.end(), rowid)) {
-                // We already have the serial types, so just use them
-                std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, start_pos, rowid);
-                std::vector<std::string> column_values = db.extractColumnValues(serial_types, rowid);
-                std::cout << "end: " << end_pos << std::endl;
-                std::cout << "start: " << start_pos << std::endl;
-                //std::cout << "found at idx: " << k << std::endl;
-                std::cout << "num rows: " << number_of_rows << std::endl;
-                std::cout << "front: " << out_id.front() << std::endl;
-                // Clear the row map instead of creating a new one
-                row.clear();
-                bool is_first_iteration = true;
-                
-                for (int col_index : col_indices) {
-                    if (col_index < column_values.size()) {
-                        row[index_to_name[col_index]] = column_values[col_index];
-                    }
+            for (int k = start_pos; k < number_of_rows; k++) {
+                uint64_t rowid = db.computeRowId(page_offset, buf,k);
+                if (rowid > out_id.back()) {
+                    break;
                 }
-                
-                if(db.evaluateWhere(where, row)) {
-                    for(const auto& val : row) {
-                        if(is_first_iteration) {
-                            std::cout << val.second;
-                            is_first_iteration = false;
-                            out_id.erase(out_id.begin());
+                if (std::binary_search(out_id.begin(), out_id.end(), rowid)) {
+                    // We already have the serial types, so just use them
+                    std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, k, rowid);
+                    std::vector<std::string> column_values = db.extractColumnValues(serial_types, rowid);
+                    /*
+                    std::cout << "end: " << end_pos << std::endl;
+                    std::cout << "start: " << start_pos << std::endl;
+                    std::cout << "found at idx: " << k << std::endl;
+                    std::cout << "num rows: " << number_of_rows << std::endl;
+                    std::cout << "front: " << out_id.front() << std::endl;*/
+                    // Clear the row map instead of creating a new one
+                    row.clear();
+                    bool is_first_iteration = true;
+
+                    for (int col_index : col_indices) {
+                        if (col_index < column_values.size()) {
+                            row[index_to_name[col_index]] = column_values[col_index];
                         }
-                        else std::cout << "|" << val.second;
                     }
-                    std::cout << std::endl;
+                    if(db.evaluateWhere(where, row)) {
+                        for(const auto& val : row) {
+                            if(is_first_iteration) {
+                                std::cout << val.second;
+                                is_first_iteration = false;
+                                out_id.erase(out_id.begin());
+                            }
+                            else std::cout << "|" << val.second;
+                        }
+                        std::cout << std::endl;
+                    }
                 }
-            }
-            else {
-                return;
-            }
-        //}
+            
+        }
     } else {
         // Original behavior when no target rowids are provided
         for (int k = 0; k < number_of_rows; k++) {
@@ -207,43 +208,34 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
                 break;
             }
             else {
-                // optimized version
-                uint64_t min_rowid = out_id.front();
-                uint64_t max_rowid = out_id.back();
-                
-                int start_idx = 0;
-                int end_idx = cell_count - 1;
-
-                // using binary search
-                while(start_idx <= end_idx) {
-                    int mid = start_idx + (end_idx - start_idx) / 2;
-                    if (row_ids[mid] >= min_rowid) {
-                        end_idx = mid - 1;
-                    }
-                    else {
-                        start_idx = mid + 1;
-                    }
+                size_t start_idx = 0;
+                size_t end_idx = cell_count;
+            
+                // Find first page that could contain our target
+                while (start_idx < cell_count && row_ids[start_idx] < out_id.front()) {
+                    start_idx++;
                 }
+                if (start_idx > 0) start_idx--; // Include the page before our first potential match
+                
+                // Find last page that could contain our target
+                while (end_idx > 0 && row_ids[end_idx - 1] > out_id.back()) {
+                    end_idx--;
+                }
+                if (end_idx < cell_count) end_idx++; // Include the page after our last potential match
 
-                for (int i = start_idx; i < cell_count; i++) {
-                    // stop traversing if the page has gone past the max rowid
-                    if (row_ids[i] > max_rowid) {
-                        break;
-                    }
-                    // Traverse the left child page
+                // Traverse only the pages in our range
+                for (size_t i = start_idx; i < end_idx; i++) {
                     traverseBTreePageTableB(database_file, left_pointers[i], page_size, string_parser,
                         col_indices, index_to_name, db, out_id);
                 }
-
-                // Check if we need to traverse the rightmost child
-                if (start_idx < cell_count && row_ids[start_idx] <= max_rowid) {
+                
+                // Check if we need to traverse the right child
+                if (end_idx == cell_count || row_ids[end_idx - 1] <= out_id.back()) {
                     traverseBTreePageTableB(database_file, right_child, page_size, string_parser,
                         col_indices, index_to_name, db, out_id);
                 }
                 break;
-
             }
-
         }
         default:
             std::cout << "Unknown page type" << std::endl;
@@ -388,7 +380,6 @@ void BTreeNavigator::traverseBTreePageIndexB(std::ifstream& database_file, uint3
                     else if (key_val == x.value) {
                         out_id.push_back(static_cast<unsigned long>(std::stol(row["rowid"])));
                         this->traverseBTreePageIndexB(database_file, left_pointer, page_size, string_parser, clause, db, out_id, targets);
-                        std::cout << "here" << std::endl;
                         went_left = true;
                         break;
                     }
