@@ -43,6 +43,7 @@ private:
 public:
     Database(std::ifstream&& database_file, BTreeNavigator nav) : database_file(std::move(database_file)), b_tree_nav(nav) {}
     const std::streampos getFileSize() const;
+    uint64_t computeRowId(uint32_t page_offset, char* buf, int index) const;
     void printTables();
     void printDBInfo();
     void printRowCount(const std::string& query);

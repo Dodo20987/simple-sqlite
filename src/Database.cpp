@@ -194,6 +194,22 @@ std::vector<uint64_t> Database::computeIndexSerialTypes(uint64_t page_offset, ch
     
     return serial_types;
 }
+uint64_t Database::computeRowId(uint32_t page_offset, char* buf, int index) const {
+    database_file.seekg(page_offset + 8 + (index * 2));
+    database_file.read(buf,2);
+    unsigned short cell_offset = (static_cast<unsigned char>(buf[1]) | (static_cast<unsigned char>(buf[0]) << 8));
+
+    database_file.seekg(page_offset + cell_offset);
+    unsigned char varint_buf[9];
+    database_file.read(reinterpret_cast<char*>(varint_buf), 9); 
+
+    int offset = 0;
+    int bytes;
+    uint64_t payload_size = this->parseVarint(varint_buf + offset, bytes);
+    offset += bytes;
+    uint64_t rowid = this->parseVarint(varint_buf + offset, bytes);
+    return rowid;
+}
 std::vector<uint64_t> Database::computeSerialTypes(uint32_t page_offset, char* buf, int index, uint64_t& rowid) const {
     database_file.seekg(page_offset + 8 + (index * 2));
     database_file.read(buf,2);
