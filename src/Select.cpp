@@ -122,6 +122,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 if (it != column_names.end()) {
                     matched_iterators.push_back(it);
                 }
+                //std::cout << "col: " << x << std::endl;
             }
             for (const auto& x : matched_iterators) {
                 int col_index = std::distance(column_names.begin(), x);
@@ -141,7 +142,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
             database_file.read(buf,1);
             uint32_t flag = static_cast<uint32_t>(buf[0]);
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
-            col_indices, index_to_name, *this, out_id);
+            col_indices,desired_col_indices ,index_to_name, *this, out_id);
             break;
         }
     }
@@ -209,7 +210,7 @@ void Database::selectColumn(const std::string& query) {
             uint32_t flag = static_cast<uint32_t>(buf[0]);
             std::vector<unsigned long> out_id;
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
-            col_indices, index_to_name, *this, out_id);
+            col_indices,desired_col_indices, index_to_name, *this, out_id);
             break;
         }
     }

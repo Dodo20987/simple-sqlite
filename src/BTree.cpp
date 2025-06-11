@@ -36,7 +36,7 @@ IndexB BTreeNavigator::getPageTypeIndexB(std::ifstream& database_file, uint32_t 
 
 //TODO: make out_id a deque for faster front removal
 void BTreeNavigator::readLeafTablePage(std::ifstream& database_file, uint32_t page_offset, SQLParser& string_parser, std::vector<int>& col_indices,
-std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<unsigned long>& out_id) {
+std::vector<int>& desired_col_indices,std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<unsigned long>& out_id) {
     // number of cells
     char buf[2];
     database_file.seekg(page_offset + 3);
@@ -54,7 +54,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
         while (start_pos <= end_pos) {
             int mid = start_pos + (end_pos - start_pos) / 2;
             uint64_t rowid = db.computeRowId(page_offset, buf, mid);
-            //std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, mid, rowid);
             
             if (rowid >= out_id.front()) {
                 end_pos = mid - 1;
@@ -70,13 +69,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
         
         // Now process only cells that might contain our target rowids
         // TODO: looping here is not necessary cause we used binary search
-        //for (int k = start_pos; k < number_of_rows; k++) {
-            //uint64_t rowid = 0;
-            // Get rowid from computeSerialTypes but don't use the serial types yet
-            
-            // If we've gone past our target range, stop processing
-            
-            // Only process if this rowid is in our target list
             for (int k = start_pos; k < number_of_rows; k++) {
                 uint64_t rowid = db.computeRowId(page_offset, buf,k);
                 if (rowid > out_id.back()) {
@@ -86,12 +78,6 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
                     // We already have the serial types, so just use them
                     std::vector<uint64_t> serial_types = db.computeSerialTypes(page_offset, buf, k, rowid);
                     std::vector<std::string> column_values = db.extractColumnValues(serial_types, rowid);
-                    /*
-                    std::cout << "end: " << end_pos << std::endl;
-                    std::cout << "start: " << start_pos << std::endl;
-                    std::cout << "found at idx: " << k << std::endl;
-                    std::cout << "num rows: " << number_of_rows << std::endl;
-                    std::cout << "front: " << out_id.front() << std::endl;*/
                     // Clear the row map instead of creating a new one
                     row.clear();
                     bool is_first_iteration = true;
@@ -102,13 +88,13 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
                         }
                     }
                     if(db.evaluateWhere(where, row)) {
-                        for(const auto& val : row) {
+                        for (int col_index : desired_col_indices) {
                             if(is_first_iteration) {
-                                std::cout << val.second;
+                                std::cout << row[index_to_name[col_index]];
                                 is_first_iteration = false;
                                 out_id.erase(out_id.begin());
                             }
-                            else std::cout << "|" << val.second;
+                            else std::cout << "|" << row[index_to_name[col_index]];
                         }
                         std::cout << std::endl;
                     }
@@ -130,12 +116,12 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
                 }
             }
             if(db.evaluateWhere(where, row)) {
-                for(const auto& val : row) {
+                for (int col_index : desired_col_indices) {
                     if(is_first_iteration) {
-                        std::cout << val.second;
+                        std::cout << row[index_to_name[col_index]];
                         is_first_iteration = false;
                     }
-                    else std::cout << "|" << val.second;
+                    else std::cout << "|" << row[index_to_name[col_index]];
                 }
                 std::cout << std::endl;
             }
@@ -146,13 +132,13 @@ std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<u
 //TODO: need to traverse the b tree by looking at the out_id row id's and by looking at the first and last row id's of the page
 // to determine if the page should be skipped or not 
 void BTreeNavigator::traverseBTreePageTableB(std::ifstream& database_file, uint32_t page_number, int page_size, SQLParser& string_parser,
-std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<unsigned long>& out_id) {
+std::vector<int>& col_indices,std::vector<int>& desired_col_indices, std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<unsigned long>& out_id) {
     TableB page_type = this->getPageTypeTableB(database_file, page_number, page_size);
     switch(page_type) {
         case TableB::leafCell: {
             uint32_t page_offset = (page_number - 1) * page_size + (page_number == 1 ? 100 : 0);
             //std::cout << "leaf entered" << std::endl;
-            readLeafTablePage(database_file, page_offset, string_parser, col_indices, index_to_name, db, out_id);
+            readLeafTablePage(database_file, page_offset, string_parser, col_indices, desired_col_indices, index_to_name, db, out_id);
             break;
         }
         case TableB::interiorCell: {
@@ -201,10 +187,10 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
                 // Traverse all pages
                 for (auto& page_num : left_pointers) {
                     traverseBTreePageTableB(database_file, page_num, page_size, string_parser,
-                        col_indices, index_to_name, db, out_id);
+                        col_indices, desired_col_indices,index_to_name, db, out_id);
                 }
                 traverseBTreePageTableB(database_file, right_child, page_size, string_parser,
-                    col_indices, index_to_name, db, out_id);
+                    col_indices, desired_col_indices,index_to_name, db, out_id);
                 break;
             }
             else {
@@ -226,13 +212,13 @@ std::vector<int>& col_indices, std::unordered_map<int, std::string>& index_to_na
                 // Traverse only the pages in our range
                 for (size_t i = start_idx; i < end_idx; i++) {
                     traverseBTreePageTableB(database_file, left_pointers[i], page_size, string_parser,
-                        col_indices, index_to_name, db, out_id);
+                        col_indices, desired_col_indices,index_to_name, db, out_id);
                 }
                 
                 // Check if we need to traverse the right child
                 if (end_idx == cell_count || row_ids[end_idx - 1] <= out_id.back()) {
                     traverseBTreePageTableB(database_file, right_child, page_size, string_parser,
-                        col_indices, index_to_name, db, out_id);
+                        col_indices, desired_col_indices,index_to_name, db, out_id);
                 }
                 break;
             }
