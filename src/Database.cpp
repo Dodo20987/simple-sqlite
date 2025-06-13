@@ -67,7 +67,6 @@ std::unordered_map<std::string, schemaRecord> Database::getRecords(unsigned shor
         SQLParser check_index(sql_string);
         schemaRecord table_record = {type_name_string,table_name_string, tbl_string, root_string,sql_string};
         if (check_index.isCreateIndex()) {
-            std::cout << "is_index" << std::endl;
             table_record.is_index = true;
         }
         records[table_name_string] = table_record;
@@ -306,7 +305,6 @@ int64_t Database::parseVarint(const unsigned char* data, int& bytes_read) const 
 
     result = (result << 8) | data[8];
     bytes_read = 9;
-    std::cout << "res: " << std::endl;
     return result;
 
 }
@@ -406,10 +404,7 @@ void Database::printRowCount(const std::string& query) {
     while (iss >> word) {
         tokens.push_back(word);
     }
-    /*
-    for (auto x : tokens) {
-        std::cout << x << std::endl;
-    }*/
+    
     std::string table = tokens.back();
     char buf[2];
     database_file.seekg(HEADER_SIZE + 3);

@@ -22,7 +22,6 @@ std::vector<unsigned long> Database::selectColumnIndex(const schemaRecord& index
     std::vector<unsigned long> out_id;
     std::unordered_map<std::string, std::vector<std::string>> tokens = string_parser.selectQuery();
     WhereClause clause = string_parser.parseWhereClause();
-    //std::cout << "clauses: " << clause.conditions.size() << std::endl;
     std::vector<std::string> key_values;
     std::vector<std::string> column_names;
     size_t start = index_record.sql.find("(") + 1;
@@ -31,9 +30,7 @@ std::vector<unsigned long> Database::selectColumnIndex(const schemaRecord& index
     std::istringstream ss(columns_def);
     std::string col;
     SQLParser index_parser(index_record.sql);
-    //std::cout << "sql: " << index_record.sql << std::endl;
     std::vector<std::string> indices = index_parser.extractColumnIndice();
-    //std::cout << "conditions\n";
     for (const auto& x : clause.conditions) {
         if (std::find(indices.begin(), indices.end(), x.column) != indices.end()) {
             key_values.push_back(x.value);
@@ -98,7 +95,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
             if (index_record.has_value()) {
                 out_id = this->selectColumnIndex(index_record.value(), string_parser);
                 std::sort(out_id.begin(), out_id.end());
-                std::cout << "rows: " << out_id.size() << std::endl;
             }
             size_t start = x.second.sql.find('(') + 1;
             size_t end = x.second.sql.find(')');
@@ -122,7 +118,6 @@ void Database::selectColumnWithWhere(const std::string& query) {
                 if (it != column_names.end()) {
                     matched_iterators.push_back(it);
                 }
-                //std::cout << "col: " << x << std::endl;
             }
             for (const auto& x : matched_iterators) {
                 int col_index = std::distance(column_names.begin(), x);
@@ -148,6 +143,8 @@ void Database::selectColumnWithWhere(const std::string& query) {
     }
     
 }
+
+// TODO: fix this function and project is finished
 void Database::selectColumn(const std::string& query) {
     auto page_size = this->getPageSize();
     SQLParser string_parser(query);
