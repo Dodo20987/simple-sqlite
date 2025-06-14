@@ -32,7 +32,6 @@ IndexB BTreeNavigator::getPageTypeIndexB(std::ifstream& database_file, uint32_t 
     }
 }
 
-//TODO: make out_id a deque for faster front removal
 void BTreeNavigator::readLeafTablePage(std::ifstream& database_file, uint32_t page_offset, SQLParser& string_parser, std::vector<int>& col_indices,
 std::vector<int>& desired_col_indices,std::unordered_map<int, std::string>& index_to_name, Database& db, std::vector<unsigned long>& out_id) {
     // number of cells
@@ -65,7 +64,6 @@ std::vector<int>& desired_col_indices,std::unordered_map<int, std::string>& inde
         row.reserve(col_indices.size());
         
         // Now process only cells that might contain our target rowids
-        // TODO: looping here is not necessary cause we used binary search
             for (int k = start_pos; k < number_of_rows; k++) {
                 uint64_t rowid = db.computeRowId(page_offset, buf,k);
                 if (rowid > out_id.back()) {

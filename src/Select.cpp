@@ -145,6 +145,7 @@ void Database::selectColumnWithWhere(const std::string& query) {
 }
 
 // TODO: fix this function and project is finished
+// This handles select statemtnts without a where stateent
 void Database::selectColumn(const std::string& query) {
     auto page_size = this->getPageSize();
     SQLParser string_parser(query);
@@ -205,7 +206,8 @@ void Database::selectColumn(const std::string& query) {
             database_file.seekg(page_offset);
             database_file.read(buf,1);
             uint32_t flag = static_cast<uint32_t>(buf[0]);
-            std::vector<unsigned long> out_id;
+            // no out_id necesary, we don't use indexing here
+            std::vector<unsigned long> out_id; // Create empty vector for non-indexed queries
             b_tree_nav.traverseBTreePageTableB(database_file,root_page,page_size,string_parser,
             col_indices,desired_col_indices, index_to_name, *this, out_id);
             break;
